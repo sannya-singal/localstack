@@ -93,6 +93,7 @@ from localstack.aws.api.sns import (
 )
 from localstack.config import external_service_url
 from localstack.services.generic_proxy import RegionBackend
+from localstack.services.internal import get_internal_apis
 from localstack.services.moto import call_moto
 from localstack.services.plugins import ServiceLifecycleHook
 from localstack.utils.aws import aws_stack
@@ -118,6 +119,12 @@ SNS_PROTOCOLS = [
     "firehose",
 ]
 
+# Endpoint to access all the PlatformEndpoint sent Messages
+# (relative to LocalStack internal HTTP resources base endpoint)
+PLATFORM_ENDPOINT_MSGS_ENDPOINT = "/sns/platform-endpoint-messages"
+_PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED = False
+
+
 # set up logger
 LOG = logging.getLogger(__name__)
 
@@ -131,7 +138,7 @@ class SNSBackend(RegionBackend):
     subscription_status: Dict[str, Dict]
     # maps topic ARN to list of tags
     sns_tags: Dict[str, List[Dict]]
-    # cache of topic ARN to platform endpoint messages (used primarily for testing)
+    # cache of endpoint ARN to platform endpoint messages (used primarily for testing)
     platform_endpoint_messages: Dict[str, List[Dict]]
 
     # list of sent SMS messages - TODO: expose via internal API
@@ -292,6 +299,10 @@ def send_message_to_GCM(app_attributes, endpoint_attributes, message):
 
 
 class SnsProvider(SnsApi, ServiceLifecycleHook):
+    def on_after_init(self):
+        # Allow sent platform endpoint messages to be retrieved from the SNS endpoint
+        register_sns_api_resource()
+
     def add_permission(
         self,
         context: RequestContext,
@@ -1497,3 +1508,43 @@ def unsubscribe_sqs_queue(queue_url):
             sub_url = subscriber.get("sqs_queue_url") or subscriber["Endpoint"]
             if queue_url == sub_url:
                 subscriptions.remove(subscriber)
+
+
+def register_sns_api_resource():
+    """Register the platform endpointmessages retrospection endpoint as an internal LocalStack endpoint."""
+    # Use a global to indicate whether the resource has already been registered
+    # This is cheaper than iterating over the registered routes in the Router object
+    global _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED
+
+    if not _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED:
+        get_internal_apis().add(
+            PLATFORM_ENDPOINT_MSGS_ENDPOINT, SNSServicePlatformEndpointMessagesApiResource()
+        )
+        _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED = True
+
+
+class SNSServicePlatformEndpointMessagesApiResource:
+    """Provides a REST API for retrospective access to platform endpoint messages sent via SNS.
+
+    This is registered as a LocalStack internal HTTP resource.
+
+    This endpoint accepts:
+    - GET param `region`: selector for AWS `region`. If not specified, return default "us-east-1"
+    - GET param `topicArn`: filter for `topicArn` resource in SNS
+    """
+
+    def on_get(self, request):
+        region = request.args.get("region", "us-east-1")
+        filter_endpoint_arn = request.args.get("endpointArn")
+        backend = SNSBackend.get(region=region)
+        if filter_endpoint_arn:
+            messages = backend.platform_endpoint_messages.get(filter_endpoint_arn, [])
+            return {
+                "platform_endpoint_messages": {filter_endpoint_arn: messages},
+                "region": region,
+            }
+
+        return {
+            "platform_endpoint_messages": backend.platform_endpoint_messages,
+            "region": region,
+        }

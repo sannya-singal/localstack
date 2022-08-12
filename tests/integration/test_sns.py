@@ -15,8 +15,9 @@ from werkzeug import Response
 
 from localstack import config
 from localstack.aws.accounts import get_aws_account_id
+from localstack.constants import INTERNAL_RESOURCE_PATH
 from localstack.services.install import SQS_BACKEND_IMPL
-from localstack.services.sns.provider import SNSBackend
+from localstack.services.sns.provider import PLATFORM_ENDPOINT_MSGS_ENDPOINT, SNSBackend
 from localstack.testing.aws.util import is_aws_cloud
 from localstack.utils import testutil
 from localstack.utils.net import wait_for_port_closed, wait_for_port_open
@@ -463,10 +464,7 @@ class TestSNSProvider:
         snapshot.match("messages", response)
 
     @pytest.mark.only_localstack
-    def test_subscribe_platform_endpoint(
-        self, sns_client, sqs_create_queue, sns_create_topic, sns_subscription
-    ):
-
+    def test_subscribe_platform_endpoint(self, sns_client, sns_create_topic, sns_subscription):
         sns_backend = SNSBackend.get()
         topic_arn = sns_create_topic()["TopicArn"]
 
@@ -2330,3 +2328,63 @@ class TestSNSProvider:
             sleep_before = 10
 
         retry(validate_content, retries=retries, sleep_before=sleep_before, sleep=sleep)
+
+    @pytest.mark.only_localstack
+    def test_publish_to_platform_endpoint_can_retrospect(
+        self, sns_client, sns_create_topic, sns_subscription
+    ):
+        sns_backend = SNSBackend.get()
+        topic_arn = sns_create_topic()["TopicArn"]
+        application_platform_name = f"app-platform-{short_uid()}"
+
+        app_arn = sns_client.create_platform_application(
+            Name=application_platform_name, Platform="p1", Attributes={}
+        )["PlatformApplicationArn"]
+
+        endpoint_arn = sns_client.create_platform_endpoint(
+            PlatformApplicationArn=app_arn, Token=short_uid()
+        )["EndpointArn"]
+
+        endpoint_arn_2 = sns_client.create_platform_endpoint(
+            PlatformApplicationArn=app_arn, Token=short_uid()
+        )["EndpointArn"]
+
+        sns_subscription(
+            TopicArn=topic_arn,
+            Protocol="application",
+            Endpoint=endpoint_arn,
+        )
+
+        message = "This is a test message"
+        sns_client.publish(TopicArn=topic_arn, Message=message)
+        sns_client.publish(TargetArn=endpoint_arn_2, Message=message)
+
+        # assert that message has been received
+        def check_message():
+            assert len(sns_backend.platform_endpoint_messages[endpoint_arn]) > 0
+
+        retry(check_message, retries=PUBLICATION_RETRIES, sleep=PUBLICATION_TIMEOUT)
+
+        msgs_url = config.get_edge_url() + INTERNAL_RESOURCE_PATH + PLATFORM_ENDPOINT_MSGS_ENDPOINT
+        api_contents = requests.get(msgs_url).json()
+
+        assert len(api_contents["platform_endpoint_messages"]) == 2
+        assert len(api_contents["platform_endpoint_messages"][endpoint_arn]) == 1
+        assert len(api_contents["platform_endpoint_messages"][endpoint_arn_2]) == 1
+        assert api_contents["region"] == "us-east-1"
+        assert api_contents["platform_endpoint_messages"][endpoint_arn][0]["Message"][0] == message
+
+        # Ensure messages can be filtered by EndpointArn
+        msg_with_endpoint = requests.get(msgs_url, params={"endpointArn": endpoint_arn}).json()
+        assert len(msg_with_endpoint["platform_endpoint_messages"]) == 1
+        assert len(msg_with_endpoint["platform_endpoint_messages"][endpoint_arn]) == 1
+        assert api_contents["region"] == "us-east-1"
+
+        # Ensure you can select the region
+        msg_with_region = requests.get(msgs_url, params={"region": "eu-west-1"}).json()
+        assert len(msg_with_region["platform_endpoint_messages"]) == 0
+        assert msg_with_region["region"] == "eu-west-1"
+
+        sns_client.delete_endpoint(EndpointArn=endpoint_arn)
+        sns_client.delete_endpoint(EndpointArn=endpoint_arn_2)
+        sns_client.delete_platform_application(PlatformApplicationArn=app_arn)
