@@ -2334,6 +2334,11 @@ class TestSNSProvider:
         self, sns_client, sns_create_topic, sns_subscription
     ):
         sns_backend = SNSBackend.get()
+        # clean up the saved messages
+        sns_backend_endpoint_arns = list(sns_backend.platform_endpoint_messages.keys())
+        for saved_endpoint_arn in sns_backend_endpoint_arns:
+            sns_backend.platform_endpoint_messages.pop(saved_endpoint_arn, None)
+
         topic_arn = sns_create_topic()["TopicArn"]
         application_platform_name = f"app-platform-{short_uid()}"
 
