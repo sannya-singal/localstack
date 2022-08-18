@@ -102,7 +102,7 @@ from localstack.utils.aws.aws_stack import extract_region_from_arn
 from localstack.utils.aws.dead_letter_queue import sns_error_to_dead_letter_queue
 from localstack.utils.cloudwatch.cloudwatch_util import store_cloudwatch_logs
 from localstack.utils.json import json_safe
-from localstack.utils.objects import not_none_or
+from localstack.utils.objects import not_none_or, singleton_factory
 from localstack.utils.strings import long_uid, md5, short_uid, to_bytes
 from localstack.utils.threads import start_thread
 from localstack.utils.time import timestamp_millis
@@ -122,8 +122,6 @@ SNS_PROTOCOLS = [
 # Endpoint to access all the PlatformEndpoint sent Messages
 # (relative to LocalStack internal HTTP resources base endpoint)
 PLATFORM_ENDPOINT_MSGS_ENDPOINT = "/sns/platform-endpoint-messages"
-_PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED = False
-
 
 # set up logger
 LOG = logging.getLogger(__name__)
@@ -1510,17 +1508,12 @@ def unsubscribe_sqs_queue(queue_url):
                 subscriptions.remove(subscriber)
 
 
+@singleton_factory
 def register_sns_api_resource():
     """Register the platform endpointmessages retrospection endpoint as an internal LocalStack endpoint."""
-    # Use a global to indicate whether the resource has already been registered
-    # This is cheaper than iterating over the registered routes in the Router object
-    global _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED
-
-    if not _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED:
-        get_internal_apis().add(
-            PLATFORM_ENDPOINT_MSGS_ENDPOINT, SNSServicePlatformEndpointMessagesApiResource()
-        )
-        _PLATFORM_ENDPOINT_MSGS_ENDPOINT_REGISTERED = True
+    get_internal_apis().add(
+        PLATFORM_ENDPOINT_MSGS_ENDPOINT, SNSServicePlatformEndpointMessagesApiResource()
+    )
 
 
 class SNSServicePlatformEndpointMessagesApiResource:
