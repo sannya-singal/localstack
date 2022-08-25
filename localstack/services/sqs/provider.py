@@ -802,7 +802,7 @@ class QueueUpdateWorker:
             def _run(*_args):
                 self.scheduler.run()
 
-            self.thread = start_thread(_run)
+            self.thread = start_thread(_run, name="sqs-queue-update-worker")
 
     def stop(self):
         with self.mutex:

@@ -21,6 +21,9 @@ from localstack.utils.threads import FuncThread
 
 LOG = logging.getLogger(__name__)
 
+monitor_counter = 0
+counter = 0
+
 
 class StreamEventSourceListener(EventSourceListener):
     """
@@ -113,11 +116,15 @@ class StreamEventSourceListener(EventSourceListener):
         """
         Spawn coordinator thread for listening to relevant new/removed event source mappings
         """
+        global counter
         if self._COORDINATOR_THREAD is not None:
             return
 
         LOG.debug(f"Starting {self.source_type()} event source listener coordinator thread")
-        self._COORDINATOR_THREAD = FuncThread(self._monitor_stream_event_sources)
+        counter += 1
+        self._COORDINATOR_THREAD = FuncThread(
+            self._monitor_stream_event_sources, name=f"stream-listener-{counter}"
+        )
         self._COORDINATOR_THREAD.start()
 
     def _invoke_lambda(
@@ -284,6 +291,7 @@ class StreamEventSourceListener(EventSourceListener):
         spawns listener threads for each shard in the stream. When an event source is deleted, stops the associated
         child threads.
         """
+        global monitor_counter
         while True:
             try:
                 # current set of streams + shard IDs that should be feeding Lambda functions based on event sources
@@ -327,6 +335,8 @@ class StreamEventSourceListener(EventSourceListener):
                                 shard_id,
                                 source["StartingPosition"],
                             )
+                            monitor_counter += 1
+
                             listener_thread = FuncThread(
                                 self._listen_to_shard_and_invoke_lambda,
                                 {
@@ -341,6 +351,7 @@ class StreamEventSourceListener(EventSourceListener):
                                     "failure_destination": failure_destination,
                                     "max_num_retries": max_num_retries,
                                 },
+                                name=f"monitor-stream-thread-{monitor_counter}",
                             )
                             self._STREAM_LISTENER_THREADS[lock_discriminator] = listener_thread
                             listener_thread.start()

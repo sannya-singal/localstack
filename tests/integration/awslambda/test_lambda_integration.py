@@ -370,6 +370,7 @@ class TestDynamoDBEventSourceMapping:
         dynamodb_client,
         dynamodb_create_table,
         check_lambda_logs,
+        cleanups,
     ):
         def check_logs():
             expected = [
@@ -387,40 +388,38 @@ class TestDynamoDBEventSourceMapping:
         table_name = f"test-table-{short_uid()}"
         partition_key = "my_partition_key"
         db_item = {partition_key: {"S": "hello world"}}
-        try:
-            role_arn = create_iam_role_with_policy(
-                RoleName=role,
-                PolicyName=policy_name,
-                RoleDefinition=lambda_role,
-                PolicyDefinition=s3_lambda_permission,
-            )
+        role_arn = create_iam_role_with_policy(
+            RoleName=role,
+            PolicyName=policy_name,
+            RoleDefinition=lambda_role,
+            PolicyDefinition=s3_lambda_permission,
+        )
 
-            create_lambda_function(
-                handler_file=TEST_LAMBDA_PYTHON_ECHO,
-                func_name=function_name,
-                runtime=LAMBDA_RUNTIME_PYTHON37,
-                role=role_arn,
-            )
-            dynamodb_create_table(table_name=table_name, partition_key=partition_key)
-            _await_dynamodb_table_active(dynamodb_client, table_name)
-            stream_arn = dynamodb_client.update_table(
-                TableName=table_name,
-                StreamSpecification={"StreamEnabled": True, "StreamViewType": "NEW_IMAGE"},
-            )["TableDescription"]["LatestStreamArn"]
-            event_source_uuid = lambda_client.create_event_source_mapping(
-                FunctionName=function_name,
-                BatchSize=1,
-                StartingPosition="LATEST",
-                EventSourceArn=stream_arn,
-                MaximumBatchingWindowInSeconds=1,
-                MaximumRetryAttempts=1,
-            )["UUID"]
-            _await_event_source_mapping_enabled(lambda_client, event_source_uuid)
+        create_lambda_function(
+            handler_file=TEST_LAMBDA_PYTHON_ECHO,
+            func_name=function_name,
+            runtime=LAMBDA_RUNTIME_PYTHON37,
+            role=role_arn,
+        )
+        dynamodb_create_table(table_name=table_name, partition_key=partition_key)
+        _await_dynamodb_table_active(dynamodb_client, table_name)
+        stream_arn = dynamodb_client.update_table(
+            TableName=table_name,
+            StreamSpecification={"StreamEnabled": True, "StreamViewType": "NEW_IMAGE"},
+        )["TableDescription"]["LatestStreamArn"]
+        event_source_uuid = lambda_client.create_event_source_mapping(
+            FunctionName=function_name,
+            BatchSize=1,
+            StartingPosition="LATEST",
+            EventSourceArn=stream_arn,
+            MaximumBatchingWindowInSeconds=1,
+            MaximumRetryAttempts=1,
+        )["UUID"]
+        cleanups.append(lambda: lambda_client.delete_event_source_mapping(UUID=event_source_uuid))
+        _await_event_source_mapping_enabled(lambda_client, event_source_uuid)
 
-            dynamodb_client.put_item(TableName=table_name, Item=db_item)
-            retry(check_logs, retries=50, sleep=2)
-        finally:
-            lambda_client.delete_event_source_mapping(UUID=event_source_uuid)
+        dynamodb_client.put_item(TableName=table_name, Item=db_item)
+        retry(check_logs, retries=50, sleep=2)
 
     @pytest.mark.aws_validated
     def test_disabled_dynamodb_event_source_mapping(

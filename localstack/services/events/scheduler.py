@@ -29,7 +29,7 @@ class Job:
         return delay_secs is not None and delay_secs < 60
 
     def do_run(self):
-        FuncThread(self.job_func).start()
+        FuncThread(self.job_func, name="events-job-run").start()
 
 
 class JobScheduler:
@@ -72,7 +72,7 @@ class JobScheduler:
             time.sleep(59.9)
 
     def start_loop(self):
-        self.thread = FuncThread(self.loop)
+        self.thread = FuncThread(self.loop, name="events-jobscheduler-loop")
         self.thread.start()
 
     @classmethod
