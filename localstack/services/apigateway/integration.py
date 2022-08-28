@@ -294,7 +294,7 @@ class LambdaProxyIntegration(BackendIntegration):
             )
             response.status_code = 502
             response._content = json.dumps({"message": "Internal server error"})
-            return response
+            return convert_response(response)
 
         response.status_code = int(parsed_result.get("statusCode", 200))
         parsed_headers = parsed_result.get("headers", {})
