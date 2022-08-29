@@ -180,8 +180,8 @@ def is_api_key_valid(is_api_key_required: bool, headers: Dict[str, str], stage: 
 
 
 def update_content_length(response: Response):
-    if response and response.response is not None:
-        response.headers["Content-Length"] = str(len(response.response))
+    if response and response.get_data() is not None:
+        response.headers["Content-Length"] = str(len(response.get_data()))
 
 
 def apply_request_parameters(
@@ -544,7 +544,7 @@ def apply_request_response_templates(
     template = templates.get(content_type)
     if not template:
         return data
-    content = (data.response if is_response else data) or ""
+    content = (data.get_data() if is_response else data) or ""
     result = VtlTemplate().render_vtl(template, content, as_json=as_json)
     if is_response:
         data.set_response(result)
