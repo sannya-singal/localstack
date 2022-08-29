@@ -8,6 +8,7 @@ import pytest
 
 from localstack import config
 from localstack.constants import APPLICATION_JSON
+from localstack.http import Response
 from localstack.services.apigateway.helpers import (
     Resolver,
     apply_json_patch_safe,
@@ -27,7 +28,6 @@ from localstack.services.apigateway.templates import (
     ResponseTemplates,
     VelocityUtilApiGateway,
 )
-from localstack.utils.aws.aws_responses import requests_response
 from localstack.utils.common import clone
 from localstack.utils.files import load_file
 
@@ -262,7 +262,7 @@ class TestApplyTemplate(unittest.TestCase):
             headers={"content-type": APPLICATION_JSON},
             stage="local",
         )
-        api_context.response = requests_response({})
+        api_context.response = Response(json.dumps({}))
         api_context.integration = {
             "requestTemplates": {
                 APPLICATION_JSON: "$util.escapeJavaScript($input.json('$.message'))"
@@ -354,7 +354,7 @@ class TestTemplates:
         }
         api_context.resource_path = "/{proxy+}"
         api_context.path_params = {"id": "bar"}
-        api_context.response = requests_response({"spam": "eggs"})
+        api_context.response = Response(json.dumps({"spam": "eggs"}))
         api_context.context = {
             "httpMethod": api_context.method,
             "stage": api_context.stage,
