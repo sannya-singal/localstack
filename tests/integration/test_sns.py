@@ -2497,14 +2497,3 @@ class TestSNSProvider:
             sns_backend.platform_endpoint_messages[endpoints_arn["APNS"]][0]["Message"][0]
             == message["APNS"]
         )
-
-
-"""
-{
-  "default": "This is the default message which must be present when publishing a message to a topic. The default message will only be used if a message is not present for
-one of the notification platforms.",
-  "APNS": "{\"aps\":{\"alert\": \"Check out these awesome deals!\",\"url\":\"www.amazon.com\"} }",
-  "GCM": "{\"data\":{\"message\":\"Check out these awesome deals!\",\"url\":\"www.amazon.com\"}}",
-  "ADM": "{\"data\":{\"message\":\"Check out these awesome deals!\",\"url\":\"www.amazon.com\"}}"
-}
-"""
