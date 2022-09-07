@@ -2360,9 +2360,43 @@ class TestSNSProvider:
             Endpoint=endpoint_arn,
         )
 
-        message = "This is a test message"
-        sns_client.publish(TopicArn=topic_arn, Message=message)
-        sns_client.publish(TargetArn=endpoint_arn_2, Message=message)
+        # example message from
+        # https://docs.aws.amazon.com/sns/latest/dg/sns-send-custom-platform-specific-payloads-mobile-devices.html
+        message = json.dumps({"APNS_PLATFORM": json.dumps({"aps": {"content-available": 1}})})
+        message_for_topic = json.dumps(
+            {
+                "default": "This is the default message which must be present when publishing a message to a topic.",
+                "APNS_PLATFORM": json.dumps({"aps": {"content-available": 1}}),
+            },
+        )
+        message_attributes = {
+            "AWS.SNS.MOBILE.APNS.TOPIC": {
+                "DataType": "String",
+                "StringValue": "com.amazon.mobile.messaging.myapp",
+            },
+            "AWS.SNS.MOBILE.APNS.PUSH_TYPE": {
+                "DataType": "String",
+                "StringValue": "background",
+            },
+            "AWS.SNS.MOBILE.APNS.PRIORITY": {
+                "DataType": "String",
+                "StringValue": "5",
+            },
+        }
+        # publish to a topic which has a platform subscribed to it
+        sns_client.publish(
+            TopicArn=topic_arn,
+            Message=message_for_topic,
+            MessageAttributes=message_attributes,
+            MessageStructure="json",
+        )
+        # publish directly to the platform endpoint
+        sns_client.publish(
+            TargetArn=endpoint_arn_2,
+            Message=message,
+            MessageAttributes=message_attributes,
+            MessageStructure="json",
+        )
 
         # assert that message has been received
         def check_message():
@@ -2377,7 +2411,16 @@ class TestSNSProvider:
         assert len(api_contents["platform_endpoint_messages"][endpoint_arn]) == 1
         assert len(api_contents["platform_endpoint_messages"][endpoint_arn_2]) == 1
         assert api_contents["region"] == "us-east-1"
-        assert api_contents["platform_endpoint_messages"][endpoint_arn][0]["Message"][0] == message
+        # TODO: current implementation does not dispatch depending on platform type, we will have the message
+        # for all platforms
+        assert (
+            api_contents["platform_endpoint_messages"][endpoint_arn][0]["Message"]
+            == message_for_topic
+        )
+        assert (
+            api_contents["platform_endpoint_messages"][endpoint_arn][0]["MessageAttributes"]
+            == message_attributes
+        )
 
         # Ensure messages can be filtered by EndpointArn
         msg_with_endpoint = requests.get(msgs_url, params={"endpointArn": endpoint_arn}).json()
@@ -2393,3 +2436,75 @@ class TestSNSProvider:
         sns_client.delete_endpoint(EndpointArn=endpoint_arn)
         sns_client.delete_endpoint(EndpointArn=endpoint_arn_2)
         sns_client.delete_platform_application(PlatformApplicationArn=app_arn)
+
+    @pytest.mark.only_localstack
+    @pytest.mark.xfail(reason="Behaviour not yet implemented")
+    def test_publish_to_platform_endpoint_is_dispatched(
+        self, sns_client, sns_create_topic, sns_subscription
+    ):
+        topic_arn = sns_create_topic()["TopicArn"]
+        endpoints_arn = {}
+        for platform_type in ["APNS", "GCM"]:
+            application_platform_name = f"app-platform-{platform_type}-{short_uid()}"
+
+            # Create an Apple platform application
+            app_arn = sns_client.create_platform_application(
+                Name=application_platform_name, Platform=platform_type, Attributes={}
+            )["PlatformApplicationArn"]
+
+            endpoint_arn = sns_client.create_platform_endpoint(
+                PlatformApplicationArn=app_arn, Token=short_uid()
+            )["EndpointArn"]
+
+            # store the endpoint for checking results
+            endpoints_arn[platform_type] = endpoint_arn
+
+            # subscribe this endpoint to a topic
+            sns_subscription(
+                TopicArn=topic_arn,
+                Protocol="application",
+                Endpoint=endpoint_arn,
+            )
+
+        # now we have two platform endpoints subscribed to the same topic
+        message = {
+            "default": "This is the default message which must be present when publishing a message to a topic.",
+            "APNS": '{"aps":{"alert": "Check out these awesome deals!","url":"www.amazon.com"} }',
+            "GCM": '{"data":{"message":"Check out these awesome deals!","url":"www.amazon.com"}}',
+        }
+
+        # publish to the topic
+        sns_client.publish(
+            TopicArn=topic_arn,
+            Message=json.dumps(message),
+            MessageStructure="json",
+        )
+
+        sns_backend = SNSBackend.get()
+
+        # assert that message has been received
+        def check_message():
+            assert len(sns_backend.platform_endpoint_messages[endpoint_arn]) > 0
+
+        retry(check_message, retries=PUBLICATION_RETRIES, sleep=PUBLICATION_TIMEOUT)
+
+        # each endpoint should only receive the message that was directed to them
+        assert (
+            sns_backend.platform_endpoint_messages[endpoints_arn["GCM"]][0]["Message"][0]
+            == message["GCM"]
+        )
+        assert (
+            sns_backend.platform_endpoint_messages[endpoints_arn["APNS"]][0]["Message"][0]
+            == message["APNS"]
+        )
+
+
+"""
+{
+  "default": "This is the default message which must be present when publishing a message to a topic. The default message will only be used if a message is not present for
+one of the notification platforms.",
+  "APNS": "{\"aps\":{\"alert\": \"Check out these awesome deals!\",\"url\":\"www.amazon.com\"} }",
+  "GCM": "{\"data\":{\"message\":\"Check out these awesome deals!\",\"url\":\"www.amazon.com\"}}",
+  "ADM": "{\"data\":{\"message\":\"Check out these awesome deals!\",\"url\":\"www.amazon.com\"}}"
+}
+"""

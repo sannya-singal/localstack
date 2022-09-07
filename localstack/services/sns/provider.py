@@ -167,6 +167,8 @@ def publish_message(
         platform_app, endpoint_attributes = get_attributes_for_application_endpoint(target_arn)
         message_structure = req_data.get("MessageStructure", [None])[0]
         LOG.debug("Publishing message to Endpoint: %s | Message: %s", target_arn, message)
+        # TODO: should probably store the delivery logs
+        # https://docs.aws.amazon.com/sns/latest/dg/sns-msg-status.html
 
         start_thread(
             lambda _: message_to_endpoint(
@@ -574,6 +576,11 @@ class SnsProvider(SnsApi, ServiceLifecycleHook):
     def create_platform_application(
         self, context: RequestContext, name: String, platform: String, attributes: MapStringToString
     ) -> CreatePlatformApplicationResponse:
+        # TODO: validate platform
+        # see https://docs.aws.amazon.com/cli/latest/reference/sns/create-platform-application.html
+        # list of possible values: ADM, Baidu, APNS, APNS_SANDBOX, GCM, MPNS, WNS
+        # each platform has a specific way to handle credentials
+        # this can also be used for dispatching message to the right platform
         moto_response = call_moto(context)
         return CreatePlatformApplicationResponse(**moto_response)
 
@@ -585,12 +592,15 @@ class SnsProvider(SnsApi, ServiceLifecycleHook):
         custom_user_data: String = None,
         attributes: MapStringToString = None,
     ) -> CreateEndpointResponse:
+        # TODO: support mobile app events
+        # see https://docs.aws.amazon.com/sns/latest/dg/application-event-notifications.html
         result = None
         try:
             result = call_moto(context)
         except DuplicateSnsEndpointError:
             # TODO: this was unclear in the old provider, check against aws and moto
-            for e in self.platform_endpoints.values():
+            moto_sns_backend = sns_backends[context.account_id][context.region]
+            for e in moto_sns_backend.platform_endpoints.values():
                 if e.token == token:
                     if custom_user_data and custom_user_data != e.custom_user_data:
                         # TODO: check error against aws
@@ -1111,7 +1121,20 @@ async def message_to_subscriber(
     elif subscriber["Protocol"] == "application":
         try:
             sns_client = aws_stack.connect_to_service("sns")
-            sns_client.publish(TargetArn=subscriber["Endpoint"], Message=message)
+            if (msg_structure := req_data.get("MessageStructure")) and msg_structure[0] == "json":
+                # only valid value for MessageStructure is json, we cannot set it to nothing
+                sns_client.publish(
+                    TargetArn=subscriber["Endpoint"],
+                    Message=message,
+                    MessageAttributes=message_attributes,
+                    MessageStructure="json",
+                )
+            else:
+                sns_client.publish(
+                    TargetArn=subscriber["Endpoint"],
+                    Message=message,
+                    MessageAttributes=message_attributes,
+                )
             store_delivery_log(subscriber, True, message, message_id)
         except Exception as exc:
             LOG.warning(
@@ -1516,6 +1539,31 @@ def register_sns_api_resource():
     )
 
 
+def _format_platform_endpoint_messages(sent_messages: List[Dict[str, str]]):
+    """
+    This method format the messages to be more readable and undo the format change that was needed for Moto
+    Should be removed once we refactor SNS.
+    """
+    validated_keys = [
+        "TargetArn",
+        "Message",
+        "Message",
+        "MessageAttributes",
+        "MessageStructure",
+        "Subject",
+    ]
+    formatted_messages = []
+    for sent_message in sent_messages:
+        msg = {
+            key: value[0] if isinstance(value, list) else value
+            for key, value in sent_message.items()
+            if key in validated_keys
+        }
+        formatted_messages.append(msg)
+
+    return formatted_messages
+
+
 class SNSServicePlatformEndpointMessagesApiResource:
     """Provides a REST API for retrospective access to platform endpoint messages sent via SNS.
 
@@ -1532,12 +1580,17 @@ class SNSServicePlatformEndpointMessagesApiResource:
         backend = SNSBackend.get(region=region)
         if filter_endpoint_arn:
             messages = backend.platform_endpoint_messages.get(filter_endpoint_arn, [])
+            messages = _format_platform_endpoint_messages(messages)
             return {
                 "platform_endpoint_messages": {filter_endpoint_arn: messages},
                 "region": region,
             }
 
+        platform_endpoint_messages = {
+            endpoint_arn: _format_platform_endpoint_messages(messages)
+            for endpoint_arn, messages in backend.platform_endpoint_messages.items()
+        }
         return {
-            "platform_endpoint_messages": backend.platform_endpoint_messages,
+            "platform_endpoint_messages": platform_endpoint_messages,
             "region": region,
         }
