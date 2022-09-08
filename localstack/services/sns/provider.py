@@ -1121,20 +1121,16 @@ async def message_to_subscriber(
     elif subscriber["Protocol"] == "application":
         try:
             sns_client = aws_stack.connect_to_service("sns")
+            publish_kwargs = {
+                "TargetArn": subscriber["Endpoint"],
+                "Message": message,
+                "MessageAttributes": message_attributes,
+            }
+            # only valid value for MessageStructure is json, we cannot set it to nothing
             if (msg_structure := req_data.get("MessageStructure")) and msg_structure[0] == "json":
-                # only valid value for MessageStructure is json, we cannot set it to nothing
-                sns_client.publish(
-                    TargetArn=subscriber["Endpoint"],
-                    Message=message,
-                    MessageAttributes=message_attributes,
-                    MessageStructure="json",
-                )
-            else:
-                sns_client.publish(
-                    TargetArn=subscriber["Endpoint"],
-                    Message=message,
-                    MessageAttributes=message_attributes,
-                )
+                publish_kwargs["MessageStructure"] = "json"
+
+            sns_client.publish(**publish_kwargs)
             store_delivery_log(subscriber, True, message, message_id)
         except Exception as exc:
             LOG.warning(
