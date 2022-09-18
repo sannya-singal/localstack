@@ -20,12 +20,6 @@ class ApiGatewayVersion(Enum):
 class ApiInvocationContext:
     """Represents the context for an incoming API Gateway invocation."""
 
-    # basic (raw) HTTP invocation details (method, path, data, headers)
-    method: str
-    path: str
-    data: InvocationPayload
-    headers: Dict[str, str]
-
     # invocation context
     context: Dict[str, Any]
     # authentication info for this invocation
