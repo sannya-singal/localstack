@@ -28,11 +28,6 @@ def to_invocation_context(
     if url_params is None:
         url_params = {}
 
-    method = request.method
-    path = request.full_path if request.query_string else request.path
-    data = restore_payload(request)
-    headers = Headers(request.headers)
-
     # adjust the X-Forwarded-For header
     x_forwarded_for = headers.getlist("X-Forwarded-For")
     x_forwarded_for.append(request.remote_addr)
@@ -42,12 +37,11 @@ def to_invocation_context(
     # set the x-localstack-edge header, it is used to parse the domain
     headers[HEADER_LOCALSTACK_EDGE_URL] = request.host_url.strip("/")
 
-    # FIXME: Use the already parsed url params instead of parsing them into the ApiInvocationContext part-by-part.
-    #   We already would have all params at hand to avoid _all_ the parsing, but the parsing
-    #   has side-effects (f.e. setting the region in a thread local)!
-    #   It would be best to use a small (immutable) context for the already parsed params and the Request object
-    #   and use it everywhere.
-    return ApiInvocationContext(method, path, data, headers, stage=url_params.get("stage"))
+    return ApiInvocationContext(
+        request=request,
+        api_id=url_params.get("api_id"),
+        stage=url_params.get("stage")
+    )
 
 
 class ApigatewayRouter:

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, Optional, Union
 
 from localstack.constants import HEADER_LOCALSTACK_EDGE_URL
-from localstack.http import Response
+from localstack.http import Request, Response
 from localstack.utils.aws.aws_responses import parse_query_string
 from localstack.utils.strings import short_uid, to_str
 
@@ -19,6 +19,8 @@ class ApiGatewayVersion(Enum):
 
 class ApiInvocationContext:
     """Represents the context for an incoming API Gateway invocation."""
+
+    request: Request
 
     # invocation context
     context: Dict[str, Any]
@@ -56,19 +58,13 @@ class ApiInvocationContext:
 
     def __init__(
         self,
-        method,
-        path,
-        data,
-        headers,
+        request: Request,
         api_id=None,
         stage=None,
         context=None,
         auth_info=None,
     ):
-        self.method = method
-        self.path = path
-        self.data = data
-        self.headers = headers
+        self.request = request
         self.context = {"requestId": short_uid()} if context is None else context
         self.auth_info = {} if auth_info is None else auth_info
         self.apigw_version = None
