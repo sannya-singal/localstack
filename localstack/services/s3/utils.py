@@ -1,5 +1,6 @@
 import datetime
 import re
+from typing import Dict
 
 from moto.s3.models import FakeKey
 
@@ -13,6 +14,20 @@ BUCKET_NAME_REGEX = (
     r"(?=^.{3,63}$)(?!^(\d+\.)+\d+$)"
     + r"(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)"
 )
+
+REGION_REGEX = r"[a-z]{2}-[a-z]+-[0-9]{1,}"
+PORT_REGEX = r"(:[\d]{0,6})?"
+
+S3_VIRTUAL_HOSTNAME_REGEX = (  # path based refs have at least valid bucket expression (separated by .) followed by .s3
+    r"^(http(s)?://)?((?!s3\.)[^\./]+)\."  # the negative lookahead part is for considering buckets
+    r"(((s3(-website)?\.({}\.)?)localhost(\.localstack\.cloud)?)|(localhost\.localstack\.cloud)|"
+    r"(s3((-website)|(-external-1))?[\.-](dualstack\.)?"
+    r"({}\.)?amazonaws\.com(.cn)?)){}(/[\w\-. ]*)*$"
+).format(
+    REGION_REGEX, REGION_REGEX, PORT_REGEX
+)
+
+S3_VIRTUAL_HOST_FORWARDED_HEADER = "x-s3-vhost-forwarded-for"
 
 VALID_CANNED_ACLS = {
     ObjectCannedACL.private,
@@ -114,3 +129,15 @@ def is_valid_canonical_id(canonical_id: str) -> bool:
         return len(canonical_id) == 64 and int(canonical_id, 16)
     except ValueError:
         return False
+
+
+def uses_host_addressing(headers: Dict[str, str]) -> bool:
+    """
+    Determines if the request was forwarded from a v-host addressing style into a path one
+    """
+    # we can assume that the host header we are receiving here is actually the header we originally received
+    # from the client (because the edge service is forwarding the request in memory)
+    match = re.match(S3_VIRTUAL_HOSTNAME_REGEX, headers.get(S3_VIRTUAL_HOST_FORWARDED_HEADER, ""))
+
+    # checks whether there is a bucket name. This is sort of hacky
+    return True if match and match.group(3) else False
