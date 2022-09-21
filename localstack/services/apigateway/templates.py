@@ -171,13 +171,13 @@ class Templates:
         return self.vtl.render_vtl(template, variables=variables)
 
     @staticmethod
-    def build_variables_mapping(api_context: ApiInvocationContext):
+    def build_variables_mapping(api_context: ApiInvocationContext, body: str = None) -> Dict:
         # TODO: make this (dict) an object so usages of "render_vtl" variables are defined
         return {
             "context": api_context.context or {},
             "stage_variables": api_context.stage_variables or {},
             "input": {
-                "body": api_context.data_as_string(),
+                "body": body,
                 "params": {
                     "path": api_context.path_params,
                     "querystring": api_context.query_params(),
@@ -216,30 +216,25 @@ class ResponseTemplates(Templates):
         # XXX: keep backwards compatibility until we migrate all integrations to this new classes
         # api_context contains a response object that we want slowly remove from it
         data = kwargs.get("response", "")
-        response = data or api_context.response
+        response = data or api_context.response.get_data()
         integration = api_context.integration
-        # we set context data with the response content because later on we use context data as
-        # the body field in the template. We need to improve this by using the right source
-        # depending on the type of templates.
-
-        api_context.data = response.get_data()
 
         integration_responses = integration.get("integrationResponses") or {}
         if not integration_responses:
-            return response.get_data()
+            return api_context.response.get_data()
         entries = list(integration_responses.keys())
-        return_code = str(response.status_code)
+        return_code = str(api_context.response.status_code)
         if return_code not in entries and len(entries) > 1:
             LOG.info("Found multiple integration response status codes: %s", entries)
-            return response.get_data()
+            return api_context.response.get_data()
         return_code = entries[0]
 
         response_templates = integration_responses[return_code].get("responseTemplates", {})
         template = response_templates.get(APPLICATION_JSON, {})
         if not template:
-            return response.get_data()
+            return response
 
-        variables = self.build_variables_mapping(api_context)
+        variables = self.build_variables_mapping(api_context, body=response)
         response.set_response(self.render_vtl(template, variables=variables))
-        LOG.info("Endpoint response body after transformations:\n%s", response.response)
-        return response.get_data()
+        LOG.info("Endpoint response body after transformations:\n%s", response)
+        return response

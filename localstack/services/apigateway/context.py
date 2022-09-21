@@ -20,7 +20,10 @@ class ApiGatewayVersion(Enum):
 class ApiInvocationContext:
     """Represents the context for an incoming API Gateway invocation."""
 
+    # Werkzeug Request object
     request: Request
+    # Werkzeug Response object
+    response: Response
 
     # invocation context
     context: Dict[str, Any]
@@ -48,8 +51,6 @@ class ApiInvocationContext:
     connection_id: str
     path_params: Dict
 
-    # response object
-    response: Response
 
     stage_variables: Dict
 
@@ -75,7 +76,6 @@ class ApiInvocationContext:
         self.integration = None
         self.resource = None
         self.resource_path = None
-        self.path_with_query_string = None
         self.response_templates = {}
         self.stage_variables = {}
         self.path_params = {}
@@ -86,16 +86,17 @@ class ApiInvocationContext:
     def resource_id(self) -> Optional[str]:
         return (self.resource or {}).get("id")
 
-    # @property
-    # def invocation_path(self) -> str:
-    #     """Return the plain invocation path, without query parameters."""
-    #     path = self.path_with_query_string
-    #     return path.split("?")[0]
-    #
-    # @property
-    # def path_with_query_string(self) -> str:
-    #     """Return invocation path with query string - defaults to the value of 'path', unless customized."""
-    #     return self.request.full_path
+    @property
+    def invocation_path(self) -> str:
+        """Return the plain invocation path, without query parameters."""
+        if self.resource_path.startswith('/'):
+            return self.resource_path
+        return f"/{self.resource_path}"
+
+    @property
+    def query_string(self) -> str:
+        """Return query string."""
+        return str(self.request.query_string)
     #
     # @path_with_query_string.setter
     # def path_with_query_string(self, new_path: str):
@@ -104,8 +105,7 @@ class ApiInvocationContext:
 
     def query_params(self) -> Dict:
         """Extract the query parameters from the target URL or path in this request context."""
-        query_string = self.path_with_query_string.partition("?")[2]
-        return parse_query_string(query_string)
+        return parse_query_string(self.request.path)
 
     @property
     def integration_uri(self) -> Optional[str]:

@@ -240,8 +240,7 @@ def invoke_rest_api_from_request(invocation_context: ApiInvocationContext):
 
 
 def invoke_rest_api(invocation_context: ApiInvocationContext):
-    invocation_path = invocation_context.path_with_query_string
-    raw_path = invocation_context.path or invocation_path
+    invocation_path = invocation_context.invocation_path
     method = invocation_context.method
     headers = invocation_context.headers
 
@@ -275,8 +274,8 @@ def invoke_rest_api(invocation_context: ApiInvocationContext):
             # default to returning CORS headers if this is an OPTIONS request
             return get_cors_response(headers)
         return make_error_response(
-            "Unable to find integration for: %s %s (%s)" % (method, invocation_path, raw_path),
-            404,
+            "Unable to find integration for: %s %s (%s)" %
+            (method, invocation_path, invocation_context.path), 404,
         )
 
     # update fields in invocation context, then forward request to next handler
@@ -304,7 +303,7 @@ def invoke_rest_api_integration(invocation_context: ApiInvocationContext):
 # test the encapsulated logic
 def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext):
     # define local aliases from invocation context
-    invocation_path = invocation_context.path_with_query_string
+    invocation_path = invocation_context.invocation_path
     method = invocation_context.method
     data = invocation_context.data
     headers = invocation_context.headers
@@ -497,6 +496,7 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
         # apply custom request template
         invocation_context.context = helpers.get_event_request_context(invocation_context)
         invocation_context.stage_variables = helpers.get_stage_variables(invocation_context)
+
         request_templates = RequestTemplates()
         payload = request_templates.render(invocation_context)
 
@@ -511,7 +511,7 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
         )
         result = requests.request(method=method, url=uri, data=payload, headers=headers)
         # apply custom response template
-        invocation_context.response = convert_response(result)
+        invocation_context.response = result
         response_templates = ResponseTemplates()
         response_templates.render(invocation_context)
         return invocation_context.response
