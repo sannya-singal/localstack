@@ -171,13 +171,13 @@ class Templates:
         return self.vtl.render_vtl(template, variables=variables)
 
     @staticmethod
-    def build_variables_mapping(api_context: ApiInvocationContext, body: str = None) -> Dict:
+    def build_variables_mapping(api_context: ApiInvocationContext, data: str) -> Dict[str, Any]:
         # TODO: make this (dict) an object so usages of "render_vtl" variables are defined
         return {
             "context": api_context.context or {},
             "stage_variables": api_context.stage_variables or {},
             "input": {
-                "body": body,
+                "body": data,
                 "params": {
                     "path": api_context.path_params,
                     "querystring": api_context.query_params(),
@@ -201,7 +201,9 @@ class RequestTemplates(Templates):
         if not template:
             return api_context.data_as_string()
 
-        variables = self.build_variables_mapping(api_context)
+        variables = self.build_variables_mapping(
+            api_context, data=to_str(api_context.data_as_string())
+        )
         result = self.render_vtl(template, variables=variables)
         LOG.info(f"Endpoint request body after transformations:\n{result}")
         return result
@@ -212,11 +214,10 @@ class ResponseTemplates(Templates):
     Handles response template rendering
     """
 
-    def render(self, api_context: ApiInvocationContext, **kwargs) -> Union[bytes, str]:
+    def render(self, api_context: ApiInvocationContext) -> Union[bytes, str]:
         # XXX: keep backwards compatibility until we migrate all integrations to this new classes
         # api_context contains a response object that we want slowly remove from it
-        data = kwargs.get("response", "")
-        response = data or api_context.response.get_data()
+        response = api_context.response.get_data()
         integration = api_context.integration
 
         integration_responses = integration.get("integrationResponses") or {}
@@ -234,7 +235,7 @@ class ResponseTemplates(Templates):
         if not template:
             return response
 
-        variables = self.build_variables_mapping(api_context, body=response)
-        response.set_response(self.render_vtl(template, variables=variables))
-        LOG.info("Endpoint response body after transformations:\n%s", response)
-        return response
+        variables = self.build_variables_mapping(api_context, data=to_str(response))
+        rendered_tpl = self.render_vtl(template, variables=variables)
+        LOG.info("Endpoint response body after transformations:\n%s", rendered_tpl)
+        return rendered_tpl

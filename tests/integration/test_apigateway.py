@@ -489,7 +489,7 @@ class TestAPIGateway:
         monkeypatch.setattr(config, "DISABLE_CUSTOM_CORS_APIGATEWAY", False)
 
         test_port = get_free_tcp_port()
-        backend_url = "http://localhost:%s%s" % (test_port, self.API_PATH_HTTP_BACKEND)
+        backend_url = f"http://localhost:{test_port}{self.API_PATH_HTTP_BACKEND}"
 
         # start test HTTP backend
         proxy = self.start_http_backend(test_port)
@@ -1971,6 +1971,7 @@ class TestAPIGateway:
     @staticmethod
     def start_http_backend(test_port):
         # test listener for target HTTP backend
+
         class TestListener(ProxyListener):
             def forward_request(self, **kwargs):
                 response = Response()
@@ -1982,8 +1983,7 @@ class TestAPIGateway:
                 response._content = json.dumps(json_safe(result))
                 return response
 
-        proxy = start_proxy(test_port, update_listener=TestListener())
-        return proxy
+        return start_proxy(test_port, update_listener=TestListener())
 
     @staticmethod
     def create_api_gateway_and_deploy(

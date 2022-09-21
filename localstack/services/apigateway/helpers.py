@@ -787,9 +787,9 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
     resource_id = invocation_context.resource_id
 
     set_api_id_stage_invocation_path(invocation_context)
-    relative_path, query_string_params = extract_query_string_params(
-        path=invocation_context.path_with_query_string
-    )
+    # relative_path, query_string_params = extract_query_string_params(
+    #     path=invocation_context.path_with_query_string
+    # )
     api_id = invocation_context.api_id
     stage = invocation_context.stage
 
@@ -800,7 +800,7 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
     request_context = {
         "accountId": account_id,
         "apiId": api_id,
-        "resourcePath": resource_path or relative_path,
+        "resourcePath": resource_path,
         "domainPrefix": invocation_context.domain_prefix,
         "domainName": invocation_context.domain_name,
         "resourceId": resource_id,
@@ -826,7 +826,7 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
     request_context["identity"].update(invocation_context.auth_identity or {})
 
     if not is_test_invoke_method(method, path):
-        request_context["path"] = (f"/{stage}" if stage else "") + relative_path
+        request_context["path"] = (f"/{stage}" if stage else "") + resource_path
         request_context["stage"] = stage
     return request_context
 

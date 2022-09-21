@@ -6,7 +6,7 @@ from collections import defaultdict
 from http import HTTPStatus
 from typing import Dict, List, Union
 
-from requests import Response
+from requests import Response as RequestResponse
 
 from localstack import config
 from localstack.constants import APPLICATION_JSON, HEADER_CONTENT_TYPE
@@ -58,27 +58,25 @@ class BackendIntegration(ABC):
         return response
 
     @classmethod
-    def apply_response_parameters(
-        cls, invocation_context: ApiInvocationContext, response: Response
-    ):
+    def apply_response_parameters(cls, invocation_context: ApiInvocationContext):
         integration = invocation_context.integration
         integration_responses = integration.get("integrationResponses") or {}
         if not integration_responses:
-            return response
+            return invocation_context.response
         entries = list(integration_responses.keys())
-        return_code = str(response.status_code)
+        return_code = str(invocation_context.response.status_code)
         if return_code not in entries:
             if len(entries) > 1:
                 LOG.info("Found multiple integration response status codes: %s", entries)
-                return response
+                return invocation_context.response
             return_code = entries[0]
         response_params = integration_responses[return_code].get("responseParameters", {})
         for key, value in response_params.items():
             # TODO: add support for method.response.body, etc ...
             if str(key).lower().startswith("method.response.header."):
                 header_name = key[len("method.response.header.") :]
-                response.headers[header_name] = value.strip("'")
-        return response
+                invocation_context.response.headers[header_name] = value.strip("'")
+        return invocation_context.response
 
 
 class SnsIntegration(BackendIntegration):
@@ -324,11 +322,7 @@ class LambdaProxyIntegration(BackendIntegration):
 
 class LambdaIntegration(BackendIntegration):
     def invoke(self, invocation_context: ApiInvocationContext):
-        uri = (
-            invocation_context.integration.get("uri")
-            or invocation_context.integration.get("integrationUri")
-            or ""
-        )
+        uri = invocation_context.integration_uri or ""
         func_arn = uri
         if ":lambda:path" in uri:
             func_arn = uri.split(":lambda:path")[1].split("functions/")[1].split("/invocations")[0]
@@ -354,8 +348,8 @@ class LambdaIntegration(BackendIntegration):
             # depending on the lambda executor sometimes it returns a string and sometimes a dict
             match result:
                 case str():
-                # try to parse the result as json, if it succeeds we assume it's a valid
-                # json string
+                    # try to parse the result as json, if it succeeds we assume it's a valid
+                    # json string
                     if isinstance(json.loads(result or "{}"), dict):
                         parsed_result = json.loads(result or "{}")
                     else:
@@ -419,12 +413,12 @@ class MockIntegration(BackendIntegration):
                 )
 
         # response template
-        response = MockIntegration._create_response(
+        invocation_context.response = MockIntegration._create_response(
             status_code, invocation_context.headers, data=request_payload
         )
-        response._content = self.response_templates.render(invocation_context, response=response)
+        invocation_context.response.set_response(self.response_templates.render(invocation_context))
         # apply response parameters
-        response = self.apply_response_parameters(invocation_context, response)
+        response = self.apply_response_parameters(invocation_context)
         if not invocation_context.headers.get(HEADER_CONTENT_TYPE):
             invocation_context.headers.update({HEADER_CONTENT_TYPE: APPLICATION_JSON})
         return response

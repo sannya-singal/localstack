@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional, Union
 
 from localstack.constants import HEADER_LOCALSTACK_EDGE_URL
 from localstack.http import Request, Response
-from localstack.utils.aws.aws_responses import parse_query_string
 from localstack.utils.strings import short_uid, to_str
 
 # type definition for data parameters (i.e., invocation payloads)
@@ -51,7 +50,6 @@ class ApiInvocationContext:
     connection_id: str
     path_params: Dict
 
-
     stage_variables: Dict
 
     # websockets route selection
@@ -89,23 +87,23 @@ class ApiInvocationContext:
     @property
     def invocation_path(self) -> str:
         """Return the plain invocation path, without query parameters."""
-        if self.resource_path.startswith('/'):
+        if self.resource_path.startswith("/"):
             return self.resource_path
         return f"/{self.resource_path}"
 
     @property
     def query_string(self) -> str:
         """Return query string."""
-        return str(self.request.query_string)
-    #
-    # @path_with_query_string.setter
-    # def path_with_query_string(self, new_path: str):
-    #     """Set a custom invocation path with query string (used to handle "../_user_request_/.." paths)."""
-    #     self._path_with_query_string = new_path
+        return str(self.request.query_string, "UTF-8")
+
+    @property
+    def path_with_query_string(self):
+        """Set a custom invocation path with query string (used to handle "../_user_request_/.." paths)."""
+        return f"{self.invocation_path}{self.query_string}"
 
     def query_params(self) -> Dict:
         """Extract the query parameters from the target URL or path in this request context."""
-        return parse_query_string(self.request.path)
+        return self.request.args
 
     @property
     def integration_uri(self) -> Optional[str]:
@@ -148,7 +146,9 @@ class ApiInvocationContext:
     @property
     def is_data_base64_encoded(self):
         try:
-            json.dumps(self.request.data) if isinstance(self.request.data, (dict, list)) else to_str(self.request.data)
+            json.dumps(self.request.data) if isinstance(
+                self.request.data, (dict, list)
+            ) else to_str(self.request.data)
             return False
         except UnicodeDecodeError:
             return True
@@ -156,14 +156,18 @@ class ApiInvocationContext:
     def data_as_string(self) -> str:
         try:
             return (
-                json.dumps(self.request.data) if isinstance(self.request.data, (dict, list)) else to_str(self.request.data)
+                json.dumps(self.request.data)
+                if isinstance(self.request.data, (dict, list))
+                else to_str(self.request.data)
             )
         except UnicodeDecodeError:
             # we string encode our base64 as string as well
             return to_str(base64.b64encode(self.request.data))
 
     def _extract_host_from_header(self):
-        host = self.request.headers.get(HEADER_LOCALSTACK_EDGE_URL) or self.request.headers.get("host", "")
+        host = self.request.headers.get(HEADER_LOCALSTACK_EDGE_URL) or self.request.headers.get(
+            "host", ""
+        )
         return host.split("://")[-1].split("/")[0].split(":")[0]
 
     @property

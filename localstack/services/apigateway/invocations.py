@@ -274,8 +274,9 @@ def invoke_rest_api(invocation_context: ApiInvocationContext):
             # default to returning CORS headers if this is an OPTIONS request
             return get_cors_response(headers)
         return make_error_response(
-            "Unable to find integration for: %s %s (%s)" %
-            (method, invocation_path, invocation_context.path), 404,
+            "Unable to find integration for: %s %s (%s)"
+            % (method, invocation_path, invocation_context.path),
+            404,
         )
 
     # update fields in invocation context, then forward request to next handler
@@ -511,7 +512,7 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
         )
         result = requests.request(method=method, url=uri, data=payload, headers=headers)
         # apply custom response template
-        invocation_context.response = result
+        invocation_context.response = convert_response(result)
         response_templates = ResponseTemplates()
         response_templates.render(invocation_context)
         return invocation_context.response
