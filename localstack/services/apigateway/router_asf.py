@@ -29,13 +29,13 @@ def to_invocation_context(
         url_params = {}
 
     # adjust the X-Forwarded-For header
-    x_forwarded_for = headers.getlist("X-Forwarded-For")
+    x_forwarded_for = request.headers.getlist("X-Forwarded-For")
     x_forwarded_for.append(request.remote_addr)
     x_forwarded_for.append(request.host)
-    headers["X-Forwarded-For"] = ", ".join(x_forwarded_for)
+    request.headers["X-Forwarded-For"] = ", ".join(x_forwarded_for)
 
     # set the x-localstack-edge header, it is used to parse the domain
-    headers[HEADER_LOCALSTACK_EDGE_URL] = request.host_url.strip("/")
+    request.headers[HEADER_LOCALSTACK_EDGE_URL] = request.host_url.strip("/")
 
     return ApiInvocationContext(
         request=request,
