@@ -231,7 +231,7 @@ def apply_response_parameters(invocation_context: ApiInvocationContext):
 
 
 def invoke_rest_api_from_request(invocation_context: ApiInvocationContext):
-    helpers.set_api_id_stage_invocation_path(invocation_context)
+    #helpers.set_api_id_stage_invocation_path(invocation_context)
     try:
         return invoke_rest_api(invocation_context)
     except AuthorizationError as e:
@@ -303,7 +303,6 @@ def invoke_rest_api_integration(invocation_context: ApiInvocationContext):
 # TODO: refactor this to have a class per integration type to make it easy to
 # test the encapsulated logic
 def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext):
-    # define local aliases from invocation context
     invocation_path = invocation_context.invocation_path
     method = invocation_context.method
     data = invocation_context.data
@@ -324,6 +323,9 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
     except Exception:
         path_params = {}
 
+    #
+    # Lambda backend integration
+    #
     if (uri.startswith("arn:aws:apigateway:") and ":lambda:path" in uri) or uri.startswith(
         "arn:aws:lambda"
     ):
@@ -337,6 +339,9 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
         )
 
     elif integration_type == "AWS":
+        #
+        # Kinesis backend integration
+        #
         if "kinesis:action/" in uri:
             if uri.endswith("kinesis:action/PutRecord"):
                 target = kinesis_listener.ACTION_PUT_RECORD
@@ -375,10 +380,14 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
             response_templates = ResponseTemplates()
             response_templates.render(invocation_context)
             return invocation_context.response
-
+        #
+        # Step Functions backend integration
+        #
         elif "states:action/" in uri:
             return StepFunctionIntegration().invoke(invocation_context)
-        # https://docs.aws.amazon.com/apigateway/api-reference/resource/integration/
+        #
+        # S3 backend integration
+        #
         elif ("s3:path/" in uri or "s3:action/" in uri) and method == "GET":
             s3 = aws_stack.connect_to_service("s3")
             uri = apply_request_parameters(
@@ -413,6 +422,9 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
                 return make_error_response(msg, 400)
 
         if method == "POST":
+            #
+            # SQS backend integration
+            #
             if uri.startswith("arn:aws:apigateway:") and ":sqs:path" in uri:
                 template = integration["requestTemplates"][APPLICATION_JSON]
                 account_id, queue = uri.split("/")[-2:]
@@ -433,6 +445,9 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
                     url, method="POST", headers=headers, data=new_request
                 )
                 return convert_response(result)
+            #
+            # SNS backend integration
+            #
             elif uri.startswith("arn:aws:apigateway:") and ":sns:path" in uri:
                 invocation_context.context = helpers.get_event_request_context(invocation_context)
                 invocation_context.stage_variables = helpers.get_stage_variables(invocation_context)
@@ -448,6 +463,9 @@ def invoke_rest_api_integration_backend(invocation_context: ApiInvocationContext
         )
 
     elif integration_type == "AWS_PROXY":
+        #
+        # DynamoDB backend integration
+        #
         if uri.startswith("arn:aws:apigateway:") and ":dynamodb:action" in uri:
             # arn:aws:apigateway:us-east-1:dynamodb:action/PutItem&Table=MusicCollection
             table_name = uri.split(":dynamodb:action")[1].split("&Table=")[1]

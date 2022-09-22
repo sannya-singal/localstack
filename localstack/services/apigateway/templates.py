@@ -180,7 +180,7 @@ class Templates:
                 "body": data,
                 "params": {
                     "path": api_context.path_params,
-                    "querystring": api_context.query_params(),
+                    "querystring": dict(api_context.query_params()),
                     "header": api_context.headers,
                 },
             },

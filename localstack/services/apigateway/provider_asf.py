@@ -3,6 +3,8 @@ import logging
 
 from localstack.aws.api import RequestContext, handler
 from localstack.aws.api.apigateway import TestInvokeMethodRequest, TestInvokeMethodResponse
+from localstack.http import Request
+from localstack.services.apigateway.helpers import extract_query_string_params
 from localstack.services.apigateway.invocations import invoke_rest_api_from_request
 from localstack.services.apigateway.provider import ApigatewayProvider
 from localstack.services.apigateway.router_asf import ApigatewayRouter, to_invocation_context
@@ -34,14 +36,13 @@ class AsfApigatewayProvider(ApigatewayProvider):
     ) -> TestInvokeMethodResponse:
 
         invocation_context = to_invocation_context(context.request)
-        invocation_context.method = request["httpMethod"]
+        invocation_context.api_id = request.get("restApiId")
+        invocation_context._method = request.get("httpMethod")
 
-        if data := parse_json_or_yaml(to_str(invocation_context.data or b"")):
-            orig_data = data
-            if path_with_query_string := orig_data.get("pathWithQueryString"):
-                invocation_context.path_with_query_string = path_with_query_string
-            invocation_context.data = data.get("body")
-            invocation_context.headers = orig_data.get("headers", {})
+        if data := parse_json_or_yaml(to_str(context.request.data or b"")):
+            if path_with_query_string := data.get("pathWithQueryString"):
+                invocation_context._path_with_query_string = path_with_query_string
+                invocation_context._invocation_path = path_with_query_string.split("?")[0]
 
         result = invoke_rest_api_from_request(invocation_context)
 

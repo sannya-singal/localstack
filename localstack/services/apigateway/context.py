@@ -24,6 +24,22 @@ class ApiInvocationContext:
     # Werkzeug Response object
     response: Response
 
+    # HTTP method (GET, POST, etc.) of the request. For some use cases, this is not the same as the
+    # HTTP method on the request object, e.g., "TestInvokeMethod".
+    _method: Optional[str] = None
+
+    # Invocation path with query string, e.g., "/my/path?test". Defaults to "path", can be used
+    #  to overwrite the actual API path, in case the path format "../_user_request_/.." is used.
+    _path_with_query_string: Optional[str] = None
+
+    # Invocation path used to call API Gateway routes. It differs from the resource path,
+    # which is the actual route configuration (e.g., "/my/path/{id}") whereas the invocation path
+    # is the actual path used to invoke the API (e.g., "/my/path/123").
+    _invocation_path: Optional[str] = None
+
+    # Region name (e.g., "us-east-1") of the API Gateway request
+    region_name: Optional[str] = None
+
     # invocation context
     context: Dict[str, Any]
     # authentication info for this invocation
@@ -33,24 +49,20 @@ class ApiInvocationContext:
     apigw_version: ApiGatewayVersion
     api_id: str
     stage: str
-    account_id: str
-    region_name: str
+    account_id: str = None
     # resource path, including any path parameter placeholders (e.g., "/my/path/{id}")
-    resource_path: str
-    integration: Dict
-    resource: Dict
-    # Invocation path with query string, e.g., "/my/path?test". Defaults to "path", can be used
-    #  to overwrite the actual API path, in case the path format "../_user_request_/.." is used.
-    _path_with_query_string: str
+    resource_path: str = None
+    integration: Dict = None
+    resource: Dict = None
 
     # response templates to be applied to the invocation result
-    response_templates: Dict
+    response_templates: Dict = None
 
-    route: Dict
-    connection_id: str
-    path_params: Dict
+    route: Dict = None
+    connection_id: str = None
+    path_params: Dict = None
 
-    stage_variables: Dict
+    stage_variables: Dict = None
 
     # websockets route selection
     ws_route: str
@@ -65,20 +77,9 @@ class ApiInvocationContext:
     ):
         self.request = request
         self.context = {"requestId": short_uid()} if context is None else context
-        self.auth_info = {} if auth_info is None else auth_info
-        self.apigw_version = None
         self.api_id = api_id
         self.stage = stage
-        self.region_name = None
-        self.account_id = None
-        self.integration = None
-        self.resource = None
-        self.resource_path = None
-        self.response_templates = {}
-        self.stage_variables = {}
-        self.path_params = {}
-        self.route = None
-        self.ws_route = None
+        self.auth_info = auth_info or {}
 
     @property
     def resource_id(self) -> Optional[str]:
@@ -86,24 +87,14 @@ class ApiInvocationContext:
 
     @property
     def invocation_path(self) -> str:
-        """Return the plain invocation path, without query parameters."""
-        if self.resource_path.startswith("/"):
-            return self.resource_path
-        return f"/{self.resource_path}"
+        if self._invocation_path.startswith("/"):
+            return self._invocation_path
+        return f"/{self._invocation_path}"
 
     @property
-    def query_string(self) -> str:
-        """Return query string."""
-        return str(self.request.query_string, "UTF-8")
-
-    @property
-    def path_with_query_string(self):
-        """Set a custom invocation path with query string (used to handle "../_user_request_/.." paths)."""
-        return f"{self.invocation_path}{self.query_string}"
-
-    def query_params(self) -> Dict:
-        """Extract the query parameters from the target URL or path in this request context."""
-        return self.request.args
+    def path_with_query_string(self) -> str:
+        return self._path_with_query_string or f"{self.invocation_path}?" \
+                                               f"{to_str(self.request.query_string)}"
 
     @property
     def integration_uri(self) -> Optional[str]:
@@ -146,9 +137,9 @@ class ApiInvocationContext:
     @property
     def is_data_base64_encoded(self):
         try:
-            json.dumps(self.request.data) if isinstance(
-                self.request.data, (dict, list)
-            ) else to_str(self.request.data)
+            json.dumps(self.request.get_data()) if isinstance(
+                self.request.get_data(), (dict, list)
+            ) else to_str(self.request.get_data())
             return False
         except UnicodeDecodeError:
             return True
@@ -156,9 +147,9 @@ class ApiInvocationContext:
     def data_as_string(self) -> str:
         try:
             return (
-                json.dumps(self.request.data)
-                if isinstance(self.request.data, (dict, list))
-                else to_str(self.request.data)
+                json.dumps(self.request.get_data())
+                if isinstance(self.request.get_data(), (dict, list))
+                else to_str(self.request.get_data())
             )
         except UnicodeDecodeError:
             # we string encode our base64 as string as well
@@ -181,7 +172,7 @@ class ApiInvocationContext:
 
     @property
     def method(self):
-        return self.request.method
+        return self._method or self.request.method
 
     @property
     def headers(self):
@@ -194,3 +185,6 @@ class ApiInvocationContext:
     @property
     def path(self):
         return self.request.path
+
+    def query_params(self) -> Dict:
+        return self.request.args

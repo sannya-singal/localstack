@@ -103,13 +103,12 @@ def call_lambda(function_arn: str, event: bytes, asynchronous: bool) -> str:
     lambda_client = aws_stack.connect_to_service(
         "lambda", region_name=extract_region_from_arn(function_arn)
     )
-    inv_result = lambda_client.invoke(
+    lambda_result = lambda_client.invoke(
         FunctionName=function_arn,
         Payload=event,
         InvocationType="Event" if asynchronous else "RequestResponse",
     )
-    payload = inv_result.get("Payload")
-    if payload:
+    if payload := lambda_result.get("Payload"):
         payload = to_str(payload.read())
         return payload
     return ""
@@ -245,8 +244,7 @@ class LambdaProxyIntegration(BackendIntegration):
 
     def invoke(self, invocation_context: ApiInvocationContext):
         uri = (
-            invocation_context.integration.get("uri")
-            or invocation_context.integration.get("integrationUri")
+            invocation_context.integration_uri
             or ""
         )
         relative_path, query_string_params = extract_query_string_params(
