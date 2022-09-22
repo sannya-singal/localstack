@@ -48,12 +48,11 @@ class ApiInvocationContext:
     auth_info: Dict[str, Any]
 
     # target API/resource details extracted from the invocation
-    apigw_version: ApiGatewayVersion
+    apigw_version: ApiGatewayVersion = None
     api_id: str
     stage: str
     account_id: str = None
-    # resource path, including any path parameter placeholders (e.g., "/my/path/{id}")
-    resource_path: str = None
+
     integration: Dict = None
     resource: Dict = None
 
@@ -104,6 +103,10 @@ class ApiInvocationContext:
     def integration_uri(self) -> Optional[str]:
         integration = self.integration or {}
         return integration.get("uri") or integration.get("integrationUri")
+
+    @property
+    def resource_path(self) -> str:
+        return self.resource.get("path")
 
     @property
     def auth_context(self) -> Optional[Dict]:

@@ -39,9 +39,10 @@ def to_invocation_context(
     invocation_context = ApiInvocationContext(
         request=request, api_id=url_params.get("api_id"), stage=url_params.get("stage")
     )
+    invocation_context.api_id = url_params.get("api_id")
+    invocation_context.stage = url_params.get("stage")
     invocation_context._invocation_path = url_params.get("path")
     invocation_context._data = restore_payload(request)
-    invocation_context.region_name = get_api_region(url_params.get("api_id"))
 
     return invocation_context
 
@@ -98,6 +99,8 @@ class ApigatewayRouter:
         if not get_api_region(url_params["api_id"]):
             return Response(status=404)
         invocation_context = to_invocation_context(request, url_params)
+        invocation_context.region_name = get_api_region(url_params.get("api_id"))
+
         result = invoke_rest_api_from_request(invocation_context)
         if result is not None:
             return result

@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib import parse as urlparse
 
 import pytz
+import werkzeug
 from apispec import APISpec
 from botocore.utils import InvalidArnException
 from jsonpatch import apply_patch
@@ -753,9 +754,12 @@ def get_target_resource_details(invocation_context: ApiInvocationContext) -> Tup
     path_map = get_rest_api_paths(
         rest_api_id=invocation_context.api_id, region_name=invocation_context.region_name
     )
-    relative_path = invocation_context.invocation_path.rstrip("/") or "/"
+    #relative_path = invocation_context.invocation_path.rstrip("/") or "/"
     try:
-        extracted_path, resource = get_resource_for_path(path=relative_path, path_map=path_map)
+        extracted_path, resource = get_resource_for_path(
+            path=invocation_context.invocation_path,
+            path_map=path_map
+        )
         invocation_context.resource = resource
         return extracted_path, resource
     except Exception:
@@ -1002,6 +1006,9 @@ def convert_response(result: Response) -> Response:
     """
     if result is None:
         return Response()
+
+    if isinstance(result, werkzeug.Response):
+        return result
 
     if isinstance(result, LambdaResponse):
         headers = Headers(dict(result.headers))

@@ -280,7 +280,6 @@ def invoke_rest_api(invocation_context: ApiInvocationContext):
         )
 
     # update fields in invocation context, then forward request to next handler
-    invocation_context.resource_path = extracted_path
     invocation_context.integration = method_integration
 
     return invoke_rest_api_integration(invocation_context)
