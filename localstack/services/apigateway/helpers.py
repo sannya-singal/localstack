@@ -18,12 +18,7 @@ from werkzeug.datastructures import Headers
 
 from localstack import config
 from localstack.aws.accounts import get_aws_account_id
-from localstack.constants import (
-    APPLICATION_JSON,
-    HEADER_LOCALSTACK_EDGE_URL,
-    LOCALHOST_HOSTNAME,
-    PATH_USER_REQUEST,
-)
+from localstack.constants import APPLICATION_JSON, LOCALHOST_HOSTNAME, PATH_USER_REQUEST
 from localstack.http import Response
 from localstack.services.apigateway.context import ApiInvocationContext
 from localstack.services.generic_proxy import RegionBackend
@@ -31,7 +26,6 @@ from localstack.utils import common
 from localstack.utils.aws import aws_stack
 from localstack.utils.aws.aws_responses import LambdaResponse, requests_error_response_json
 from localstack.utils.aws.aws_stack import parse_arn
-from localstack.utils.aws.request_context import MARKER_APIGW_REQUEST_REGION, THREAD_LOCAL
 from localstack.utils.strings import long_uid
 from localstack.utils.time import TIMESTAMP_FORMAT_TZ, timestamp
 
@@ -786,7 +780,7 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
     resource_path = invocation_context.resource_path
     resource_id = invocation_context.resource_id
 
-    #set_api_id_stage_invocation_path(invocation_context)
+    # set_api_id_stage_invocation_path(invocation_context)
     # relative_path, query_string_params = extract_query_string_params(
     #     path=invocation_context.path_with_query_string
     # )
@@ -824,7 +818,9 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
     request_context["identity"].update(invocation_context.auth_identity or {})
 
     if not is_test_invoke_method(method, path):
-        request_context["path"] = (f"/{stage}" if stage else "") + invocation_context.invocation_path
+        request_context["path"] = (
+            f"/{stage}" if stage else ""
+        ) + invocation_context.invocation_path
         request_context["stage"] = stage
     return request_context
 
@@ -890,6 +886,7 @@ def get_event_request_context(invocation_context: ApiInvocationContext):
 #     invocation_context.path_with_query_string = relative_path_w_query_params
 #     return invocation_context
 #
+
 
 def get_api_region(api_id: str) -> Optional[str]:
     """Return the region name for the given REST API ID"""

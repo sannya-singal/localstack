@@ -6,8 +6,6 @@ from collections import defaultdict
 from http import HTTPStatus
 from typing import Dict, List, Union
 
-from requests import Response as RequestResponse
-
 from localstack import config
 from localstack.constants import APPLICATION_JSON, HEADER_CONTENT_TYPE
 from localstack.http import Response
@@ -27,7 +25,7 @@ from localstack.services.apigateway.templates import (
 from localstack.services.stepfunctions.stepfunctions_utils import await_sfn_execution_result
 from localstack.utils import common
 from localstack.utils.aws import aws_stack
-from localstack.utils.aws.aws_responses import LambdaResponse, requests_response
+from localstack.utils.aws.aws_responses import LambdaResponse
 from localstack.utils.aws.aws_stack import extract_region_from_arn
 from localstack.utils.collections import remove_attributes
 from localstack.utils.common import make_http_request, to_str
@@ -243,10 +241,7 @@ class LambdaProxyIntegration(BackendIntegration):
                 LOG.warning("Unable to run Lambda function on API Gateway message: %s", e)
 
     def invoke(self, invocation_context: ApiInvocationContext):
-        uri = (
-            invocation_context.integration_uri
-            or ""
-        )
+        uri = invocation_context.integration_uri or ""
         relative_path, query_string_params = extract_query_string_params(
             path=invocation_context.path_with_query_string
         )

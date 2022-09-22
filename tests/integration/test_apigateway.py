@@ -21,10 +21,11 @@ from localstack.aws.handlers import cors
 from localstack.config import get_edge_url
 from localstack.constants import (
     APPLICATION_JSON,
+    APPLICATION_X_WWW_FORM_URLENCODED,
     HEADER_LOCALSTACK_REQUEST_URL,
     LOCALHOST_HOSTNAME,
     TEST_AWS_ACCOUNT_ID,
-    TEST_AWS_REGION_NAME, APPLICATION_X_WWW_FORM_URLENCODED,
+    TEST_AWS_REGION_NAME,
 )
 from localstack.services.apigateway.helpers import (
     TAG_KEY_CUSTOM_ID,
@@ -530,7 +531,9 @@ class TestAPIGateway:
 
         # make test POST request with non-JSON content type
         data = "test=123"
-        result = requests.post(url, data=data, headers={"content-type": APPLICATION_X_WWW_FORM_URLENCODED})
+        result = requests.post(
+            url, data=data, headers={"content-type": APPLICATION_X_WWW_FORM_URLENCODED}
+        )
         assert 200 == result.status_code
         content = json.loads(to_str(result.content))
         headers = CaseInsensitiveDict(content["headers"])

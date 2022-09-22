@@ -37,6 +37,8 @@ class ApiInvocationContext:
     # is the actual path used to invoke the API (e.g., "/my/path/123").
     _invocation_path: Optional[str] = None
 
+    _data: Optional[InvocationPayload] = None
+
     # Region name (e.g., "us-east-1") of the API Gateway request
     region_name: Optional[str] = None
 
@@ -93,8 +95,10 @@ class ApiInvocationContext:
 
     @property
     def path_with_query_string(self) -> str:
-        return self._path_with_query_string or f"{self.invocation_path}?" \
-                                               f"{to_str(self.request.query_string)}"
+        return (
+            self._path_with_query_string
+            or f"{self.invocation_path}?" f"{to_str(self.request.query_string)}"
+        )
 
     @property
     def integration_uri(self) -> Optional[str]:
@@ -137,9 +141,7 @@ class ApiInvocationContext:
     @property
     def is_data_base64_encoded(self):
         try:
-            json.dumps(self.request.get_data()) if isinstance(
-                self.request.get_data(), (dict, list)
-            ) else to_str(self.request.get_data())
+            json.dumps(self._data) if isinstance(self._data, (dict, list)) else to_str(self._data)
             return False
         except UnicodeDecodeError:
             return True
@@ -147,13 +149,13 @@ class ApiInvocationContext:
     def data_as_string(self) -> str:
         try:
             return (
-                json.dumps(self.request.get_data())
-                if isinstance(self.request.get_data(), (dict, list))
-                else to_str(self.request.get_data())
+                json.dumps(self._data)
+                if isinstance(self._data, (dict, list))
+                else to_str(self._data)
             )
         except UnicodeDecodeError:
             # we string encode our base64 as string as well
-            return to_str(base64.b64encode(self.request.data))
+            return to_str(base64.b64encode(self.request.get_data()))
 
     def _extract_host_from_header(self):
         host = self.request.headers.get(HEADER_LOCALSTACK_EDGE_URL) or self.request.headers.get(

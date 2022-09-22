@@ -231,7 +231,7 @@ def apply_response_parameters(invocation_context: ApiInvocationContext):
 
 
 def invoke_rest_api_from_request(invocation_context: ApiInvocationContext):
-    #helpers.set_api_id_stage_invocation_path(invocation_context)
+    # helpers.set_api_id_stage_invocation_path(invocation_context)
     try:
         return invoke_rest_api(invocation_context)
     except AuthorizationError as e:
