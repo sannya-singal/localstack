@@ -1536,8 +1536,15 @@ class TestDynamoDB:
         table = client.describe_table(TableName=table_name)
         assert table.get("Table")
 
-    @pytest.mark.skip_snapshot_verify(paths=["$..eventID", "$..SequenceNumber"])
-    def test_data_encoding_consistency(self, dynamodbstreams_client, dynamodb_create_table_with_parameters, wait_for_stream_ready, dynamodb_client, snapshot):
+    @pytest.mark.skip_snapshot_verify(paths=["$..eventID", "$..SequenceNumber", "$..SizeBytes"])
+    def test_data_encoding_consistency(
+        self,
+        dynamodbstreams_client,
+        dynamodb_create_table_with_parameters,
+        wait_for_stream_ready,
+        dynamodb_client,
+        snapshot,
+    ):
         table_name = f"table-{short_uid()}"
         table = dynamodb_create_table_with_parameters(
             TableName=table_name,
@@ -1556,7 +1563,9 @@ class TestDynamoDB:
         )
 
         # get item
-        item = dynamodb_client.get_item(TableName=table_name, Key={PARTITION_KEY: {"S": "id1"}})["Item"]
+        item = dynamodb_client.get_item(TableName=table_name, Key={PARTITION_KEY: {"S": "id1"}})[
+            "Item"
+        ]
         snapshot.match("GetItem", item)
 
         # get stream records
@@ -1572,9 +1581,12 @@ class TestDynamoDB:
             .get("SequenceNumberRange")
             .get("StartingSequenceNumber"),
         )
-        records = dynamodbstreams_client.get_records(ShardIterator=response["ShardIterator"])["Records"]
+        records = dynamodbstreams_client.get_records(ShardIterator=response["ShardIterator"])[
+            "Records"
+        ]
 
         snapshot.match("GetRecords", records[0]["dynamodb"])
+
 
 def delete_table(name):
     dynamodb_client = aws_stack.create_external_boto_client("dynamodb")
