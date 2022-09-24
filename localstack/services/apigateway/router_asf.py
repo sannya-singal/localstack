@@ -72,12 +72,17 @@ class ApigatewayRouter:
             endpoint=self.invoke_rest_api,
             defaults={"path": "", "stage": None},
         )
+        # For API Gateway v2 this can be <stage> and root "/" or default stage "$default" and
+        # root "/my/path2". We do further check in the handler.
+        # http://0v1p6q6.execute-api.localhost.localstack.cloud:4566/<stage>/my/path2
+        # http://0v1p6q6.execute-api.localhost.localstack.cloud:4566/my/path2
         self.router.add(
             "/<stage>/",
             host="<api_id>.execute-api.<regex('.*'):server>",
             endpoint=self.invoke_rest_api,
             defaults={"path": ""},
         )
+        # e.g, http://<apiId>.execute-api.localhost.localstack.cloud:4566/<stage>/<path>
         self.router.add(
             "/<stage>/<path:path>",
             host="<api_id>.execute-api.<regex('.*'):server>",

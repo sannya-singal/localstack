@@ -420,8 +420,7 @@ class MockIntegration(BackendIntegration):
 class StepFunctionIntegration(BackendIntegration):
     def invoke(self, invocation_context: ApiInvocationContext):
         uri = (
-            invocation_context.integration.get("uri")
-            or invocation_context.integration.get("integrationUri")
+            invocation_context.integration_uri
             or ""
         )
         action = uri.split("/")[-1]
@@ -455,7 +454,7 @@ class StepFunctionIntegration(BackendIntegration):
         result = method(**payload)
         result = json_safe(remove_attributes(result, "ResponseMetadata"))
         response = StepFunctionIntegration._create_response(
-            HTTPStatus.OK.value, aws_stack.mock_aws_request_headers(), data=result
+            HTTPStatus.OK.value, aws_stack.mock_aws_request_headers(), data=json.dumps(result)
         )
         if action == "StartSyncExecution":
             # poll for the execution result and return it

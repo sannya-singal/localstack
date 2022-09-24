@@ -87,6 +87,12 @@ class ApiInvocationContext:
         return (self.resource or {}).get("id")
 
     @property
+    def resource_path(self) -> str:
+        """The resource path of the ApiGateway.V1 (e.g., "/my/path/{id}") or
+        invocation_path for ApiGatewayVersion.V2"""
+        return self.resource.get("path") if self.resource else self.invocation_path
+
+    @property
     def invocation_path(self) -> str:
         if self._invocation_path.startswith("/"):
             return self._invocation_path
@@ -104,9 +110,6 @@ class ApiInvocationContext:
         integration = self.integration or {}
         return integration.get("uri") or integration.get("integrationUri")
 
-    @property
-    def resource_path(self) -> str:
-        return self.resource.get("path")
 
     @property
     def auth_context(self) -> Optional[Dict]:
