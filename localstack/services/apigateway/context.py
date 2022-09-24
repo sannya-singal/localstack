@@ -188,7 +188,7 @@ class ApiInvocationContext:
 
     @property
     def data(self):
-        return self.request.data
+        return self._data or self.request.get_data()
 
     @property
     def path(self):
