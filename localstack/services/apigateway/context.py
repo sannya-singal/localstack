@@ -110,7 +110,6 @@ class ApiInvocationContext:
         integration = self.integration or {}
         return integration.get("uri") or integration.get("integrationUri")
 
-
     @property
     def auth_context(self) -> Optional[Dict]:
         if isinstance(self.auth_info, dict):

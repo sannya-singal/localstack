@@ -419,10 +419,7 @@ class MockIntegration(BackendIntegration):
 
 class StepFunctionIntegration(BackendIntegration):
     def invoke(self, invocation_context: ApiInvocationContext):
-        uri = (
-            invocation_context.integration_uri
-            or ""
-        )
+        uri = invocation_context.integration_uri or ""
         action = uri.split("/")[-1]
 
         if APPLICATION_JSON in invocation_context.integration.get("requestTemplates", {}):
