@@ -13,9 +13,9 @@ from urllib.parse import quote
 from botocore.exceptions import ClientError
 from moto.s3.models import FakeBucket, FakeKey
 
-from localstack.aws.api import CommonServiceException, RequestContext
+from localstack.aws.api import RequestContext
 from localstack.aws.api.events import PutEventsRequestEntry
-from localstack.aws.api.s3 import (  # EventBridgeConfiguration,; LambdaFunctionConfigurationList,; QueueConfigurationList,; TopicConfigurationList,
+from localstack.aws.api.s3 import (
     Event,
     EventBridgeConfiguration,
     EventList,
@@ -31,7 +31,11 @@ from localstack.aws.api.s3 import (  # EventBridgeConfiguration,; LambdaFunction
 )
 from localstack.config import DEFAULT_REGION
 from localstack.services.s3.models import get_moto_s3_backend
-from localstack.services.s3.utils import get_bucket_from_moto, get_key_from_moto_bucket
+from localstack.services.s3.utils import (
+    _create_invalid_argument_exc,
+    get_bucket_from_moto,
+    get_key_from_moto_bucket,
+)
 from localstack.utils.aws import aws_stack
 from localstack.utils.aws.aws_stack import ArnData, parse_arn
 from localstack.utils.strings import short_uid
@@ -45,15 +49,10 @@ EVENT_OPERATION_MAP = {
     "CompleteMultipartUpload": Event.s3_ObjectCreated_CompleteMultipartUpload,
     "PutObjectTagging": Event.s3_ObjectTagging_Put,
     "DeleteObjectTagging": Event.s3_ObjectTagging_Delete,
+    "DeleteObject": Event.s3_ObjectRemoved_Delete,
 }
 
 HEADER_AMZN_XRAY = "X-Amzn-Trace-Id"
-
-
-# TODO REBASE TO GET THIS
-class InvalidArgumentError(CommonServiceException):
-    def __init__(self, message: str, name: str, value: str):
-        super().__init__("InvalidArgument", message, 400, False)
 
 
 class S3NotificationContent(TypedDict):
@@ -69,7 +68,7 @@ class EventRecord(TypedDict):
     awsRegion: str
     eventTime: str
     eventName: str
-    userIdentity: Dict[str, str]  # TODO: maye more precise
+    userIdentity: Dict[str, str]
     requestParameters: Dict[str, str]
     responseElements: Dict[str, str]
     s3: S3NotificationContent
@@ -81,7 +80,7 @@ class Notification(TypedDict):
 
 class S3EventNotificationContext:
     def __init__(self, context: RequestContext):
-        self.event_type = EVENT_OPERATION_MAP.get(context.operation.wire_name)
+        self.event_type = EVENT_OPERATION_MAP.get(context.operation.wire_name, "")
         self.region = context.region
         self.bucket_name = context.service_request["Bucket"]
         self.key_name = context.service_request["Key"]
@@ -162,7 +161,9 @@ class BaseNotifier:
         arn, argument_name = self._get_arn_value_and_name(configuration)
 
         if not arn.startswith(f"arn:aws:{self.service_name}:"):
-            raise InvalidArgumentError("The ARN is not well formed", name=argument_name, value=arn)
+            raise _create_invalid_argument_exc(
+                "The ARN is not well formed", name=argument_name, value=arn
+            )
         if not skip_destination_validation:
             arn_data = parse_arn(arn)
             self._verify_target_exists(arn, arn_data)
@@ -172,13 +173,13 @@ class BaseNotifier:
                 rule["Name"] = rule["Name"].capitalize()
                 if not rule["Name"] in ["Suffix", "Prefix"]:
                     # TODO replace with patched InvalidArgument exception (patch service)
-                    raise InvalidArgumentError(
+                    raise _create_invalid_argument_exc(
                         "filter rule name must be either prefix or suffix",
                         rule["Name"],
                         rule["Value"],
                     )
                 if not rule["Value"]:
-                    raise InvalidArgumentError(
+                    raise _create_invalid_argument_exc(
                         "filter value cannot be empty", rule["Name"], rule["Value"]
                     )
 
@@ -247,7 +248,7 @@ class SqsNotifier(BaseNotifier):
                 QueueName=arn_data["resource"], QueueOwnerAWSAccountId=arn_data["account"]
             )
         except ClientError:
-            raise InvalidArgumentError(
+            raise _create_invalid_argument_exc(
                 "Unable to validate the following destination configurations",
                 name=arn,
                 value="The destination queue does not exist",
@@ -293,7 +294,7 @@ class SnsNotifier(BaseNotifier):
         try:
             client.get_topic_attributes(TopicArn=arn)
         except ClientError:
-            raise InvalidArgumentError(
+            raise _create_invalid_argument_exc(
                 "Unable to validate the following destination configurations",
                 name=arn,
                 value="The destination topic does not exist",
@@ -341,7 +342,7 @@ class LambdaNotifier(BaseNotifier):
         try:
             client.get_function(FunctionName=arn_data["resource"])
         except ClientError:
-            raise InvalidArgumentError(
+            raise _create_invalid_argument_exc(
                 "Unable to validate the following destination configurations",
                 name=arn,
                 value="The destination Lambda does not exist",
@@ -349,16 +350,17 @@ class LambdaNotifier(BaseNotifier):
 
     def notify(self, ctx: S3EventNotificationContext, config: LambdaFunctionConfiguration):
         event_payload = self._get_event_payload(ctx, config.get("Id"))
+        payload = json.dumps(event_payload)
         lambda_arn = config["LambdaFunctionArn"]
 
         region_name = aws_stack.extract_region_from_arn(lambda_arn)
         lambda_client = aws_stack.connect_to_service("lambda", region_name=region_name)
         lambda_function_config = aws_stack.lambda_function_name(lambda_arn)
         try:
-            lambda_client.invoke_async(
+            lambda_client.invoke(
                 FunctionName=lambda_function_config,
                 InvocationType="Event",
-                Payload=event_payload,
+                Payload=payload,
             )
         except Exception:
             LOG.exception(
@@ -465,8 +467,10 @@ class NotificationDispatcher:
         self, ctx: S3EventNotificationContext, notification_config: NotificationConfiguration
     ):
         for configuration_key, configurations in notification_config.items():
+            notifier = self.notifiers[configuration_key]
+            # there is not really a configuration for EventBridge, it is an empty dict
+            configurations = configurations if configurations else [configurations]
             for config in configurations:
-                notifier = self.notifiers[configuration_key]
                 if notifier.should_notify(ctx, config):  # we check before sending it to the thread
                     LOG.debug("Submitting task to the executor for notifier %s", notifier)
                     self.executor.submit(notifier.notify, ctx, config)

@@ -1,5 +1,6 @@
 import datetime
 import re
+from typing import Union
 
 import moto.s3.models as moto_s3_models
 from moto.s3.exceptions import MissingBucket
@@ -9,10 +10,12 @@ from localstack.aws.api import ServiceException
 from localstack.aws.api.s3 import (
     BucketName,
     ChecksumAlgorithm,
+    InvalidArgument,
     NoSuchBucket,
     NoSuchKey,
+    ObjectCannedACL,
     ObjectKey,
-    ObjectCannedACL, Permission,
+    Permission,
     PutObjectRequest,
 )
 from localstack.utils.strings import checksum_crc32, checksum_crc32c, hash_sha1, hash_sha256
@@ -148,3 +151,12 @@ def get_key_from_moto_bucket(
         raise ex
 
     return fake_key
+
+
+def _create_invalid_argument_exc(
+    message: Union[str, None], name: str, value: str
+) -> InvalidArgument:
+    ex = InvalidArgument(message)
+    ex.ArgumentName = name
+    ex.ArgumentValue = value
+    return ex

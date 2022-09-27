@@ -1,7 +1,6 @@
 import copy
 import logging
 import os
-from typing import Union
 from urllib.parse import SplitResult, quote, urlsplit, urlunsplit
 
 import moto.s3.responses as moto_s3_responses
@@ -32,7 +31,6 @@ from localstack.aws.api.s3 import (
     GetObjectRequest,
     HeadObjectOutput,
     HeadObjectRequest,
-    InvalidArgument,
     InvalidBucketName,
     ListObjectsOutput,
     ListObjectsRequest,
@@ -65,18 +63,13 @@ from localstack.services.plugins import ServiceLifecycleHook
 from localstack.services.s3.models import S3Store, get_moto_s3_backend, s3_stores
 from localstack.services.s3.notifications import NotificationDispatcher, S3EventNotificationContext
 from localstack.services.s3.utils import (
-    get_bucket_from_moto,
-    get_key_from_moto_bucket,
-    is_bucket_name_valid,
-    is_key_expired,
-    verify_checksum,
-)
-from localstack.services.s3.models import S3Store, s3_stores
-from localstack.services.s3.utils import (
     ALLOWED_HEADER_OVERRIDES,
     VALID_ACL_PREDEFINED_GROUPS,
     VALID_GRANTEE_PERMISSIONS,
+    _create_invalid_argument_exc,
+    get_bucket_from_moto,
     get_header_name,
+    get_key_from_moto_bucket,
     is_bucket_name_valid,
     is_canned_acl_valid,
     is_key_expired,
@@ -100,6 +93,11 @@ MOTO_CANONICAL_USER_ID = "75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6c
 class MalformedXML(CommonServiceException):
     def __init__(self, message=None):
         super().__init__("MalformedXML", status_code=400, message=message)
+
+
+class MalformedACLError(CommonServiceException):
+    def __init__(self, message=None):
+        super().__init__("MalformedACLError", status_code=400, message=message)
 
 
 def get_full_default_bucket_location(bucket_name):
@@ -138,9 +136,13 @@ class S3Provider(S3Api, ServiceLifecycleHook):
             self._notification_dispatcher.send_notifications(s3_notif_ctx, notification_config)
 
     def _verify_notification_configuration(
-        self, notification_configuration: NotificationConfiguration
+        self,
+        notification_configuration: NotificationConfiguration,
+        skip_destination_validation: SkipValidation,
     ):
-        self._notification_dispatcher.verify_configuration(notification_configuration)
+        self._notification_dispatcher.verify_configuration(
+            notification_configuration, skip_destination_validation
+        )
 
     @handler("CreateBucket", expand=False)
     def create_bucket(
@@ -492,7 +494,9 @@ class S3Provider(S3Api, ServiceLifecycleHook):
 
         # check if the bucket exists
         get_bucket_from_moto(get_moto_s3_backend(context), bucket=bucket)
-        self._verify_notification_configuration(notification_configuration)
+        self._verify_notification_configuration(
+            notification_configuration, skip_destination_validation
+        )
         self.get_store().bucket_notification_configs[bucket] = notification_configuration
 
     def get_bucket_notification_configuration(
@@ -588,15 +592,6 @@ def validate_bucket_name(bucket: BucketName) -> None:
         ex = InvalidBucketName("The specified bucket is not valid.")
         ex.BucketName = bucket
         raise ex
-
-
-def _create_invalid_argument_exc(
-    message: Union[str, None], name: str, value: str
-) -> InvalidArgument:
-    ex = InvalidArgument(message)
-    ex.ArgumentName = name
-    ex.ArgumentValue = value
-    return ex
 
 
 def validate_canned_acl(canned_acl: str) -> None:
