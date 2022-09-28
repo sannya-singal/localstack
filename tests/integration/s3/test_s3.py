@@ -2360,6 +2360,7 @@ class TestS3PresignedUrl:
             ("s3v4", False),
         ],
     )
+    @pytest.mark.skip_snapshot_verify(condition=is_old_provider)
     def test_put_object_with_md5_and_chunk_signature_bad_headers(
         self,
         s3_client,
@@ -2410,8 +2411,11 @@ class TestS3PresignedUrl:
         if snapshotted:
             exception = xmltodict.parse(result.content)
             snapshot.match("with-decoded-content-length", exception)
-        if signature_version == "s3":
+
+        # old provider does not raise the right error message
+        if LEGACY_S3_PROVIDER or (signature_version == "s3" and is_aws_cloud()):
             assert b"SignatureDoesNotMatch" in result.content
+        # we are either using s3v4 with new provider or whichever signature against AWS
         else:
             assert b"AccessDenied" in result.content
 
@@ -2422,7 +2426,7 @@ class TestS3PresignedUrl:
         if snapshotted:
             exception = xmltodict.parse(result.content)
             snapshot.match("without-decoded-content-length", exception)
-        if signature_version == "s3":
+        if LEGACY_S3_PROVIDER or (signature_version == "s3" and is_aws_cloud()):
             assert b"SignatureDoesNotMatch" in result.content
         else:
             assert b"AccessDenied" in result.content
@@ -2446,6 +2450,10 @@ class TestS3PresignedUrl:
 
     @pytest.mark.aws_validated
     @pytest.mark.parametrize("signature_version", ["s3", "s3v4"])
+    @pytest.mark.skip_snapshot_verify(
+        condition=is_old_provider,
+        path=["$..Error.Expires"],
+    )
     def test_s3_presigned_url_expired(
         self, s3_bucket, s3_client, monkeypatch, signature_version, snapshot
     ):
@@ -2491,6 +2499,10 @@ class TestS3PresignedUrl:
 
     @pytest.mark.aws_validated
     @pytest.mark.parametrize("signature_version", ["s3", "s3v4"])
+    @pytest.mark.skip_snapshot_verify(
+        condition=is_old_provider,
+        path=["$..Error.Message"],
+    )
     def test_s3_put_presigned_url_with_different_headers(
         self, s3_bucket, s3_client, monkeypatch, signature_version, snapshot
     ):
@@ -2581,6 +2593,8 @@ class TestS3PresignedUrl:
         snapshot.add_transformer(self._get_presigned_snapshot_transformers(snapshot))
         if not is_aws_cloud():
             monkeypatch.setattr(config, "S3_SKIP_SIGNATURE_VALIDATION", False)
+            if LEGACY_S3_PROVIDER:
+                pytest.xfail(reason="Legacy S3 provider does not implement the right behaviour")
 
         object_key = "key-double-header-param"
         s3_client.put_object(Bucket=s3_bucket, Key=object_key, Body="something")
@@ -2886,6 +2900,10 @@ class TestS3PresignedUrl:
         ],
     )
     @pytest.mark.aws_validated
+    @pytest.mark.skip_snapshot_verify(
+        condition=is_old_provider,
+        path=["$..Error.Expires"],
+    )
     def test_presigned_url_signature_authentication_expired(
         self,
         s3_client,
@@ -2928,6 +2946,10 @@ class TestS3PresignedUrl:
         ],
     )
     @pytest.mark.aws_validated
+    @pytest.mark.skip_snapshot_verify(
+        condition=is_old_provider,
+        path=["$..Error.Expires"],
+    )
     def test_presigned_url_signature_authentication(
         self,
         s3_client,
