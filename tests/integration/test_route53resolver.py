@@ -564,4 +564,3 @@ class TestRoute53Resolver:
         snapshot.add_transformer(snapshot.transform.jsonpath("$..Error.Message", msg))
         snapshot.add_transformer(snapshot.transform.jsonpath("$..Message", msg))
         snapshot.match("resource_not_found_res", resource_not_found.value.response)
-

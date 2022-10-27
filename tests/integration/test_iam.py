@@ -466,7 +466,7 @@ class TestIAMIntegrations:
         snapshot.add_transformer(snapshot.transform.iam_api())
         snapshot.add_transformer(snapshot.transform.resource_name("role_name"))
         snapshot.add_transformer(snapshot.transform.key_value("RoleId", "role_id"))
-        
+
         policy = {
             "Version": "2012-10-17",
             "Statement": [

@@ -719,10 +719,6 @@ def moto_disassociate_resolver_rule(fn, self, resolver_rule_id, vpc_id):
 def moto_create_resolver_endpoint(fn, self, *args, **kwargs):
     for group_id in kwargs.get("security_group_ids"):
         if not group_id.startswith("sg-"):
-            # raise InvalidParameterException(
-            #     f"Malformed security group ID: Invalid id: '{group_id}' "
-            #     f"(expecting 'sg-...')"
-            # )
             raise InvalidParameterException(
                 f'[RSLVR-00408] Malformed security group ID: "Invalid id: "{group_id}" '
                 f'(expecting "sg-...")".'
@@ -742,7 +738,6 @@ def moto_delete_resolver_endpoint(fn, self, resolver_rule_id):
 
 @patch(MotoRoute53ResolverBackend.create_resolver_rule)
 def moto_create_resolver_rule(fn, self, *args, **kwargs):
-    # rslver_id = kwargs.get("resolver_endpoint_id")
     direction = [
         x.direction
         for x in self.resolver_endpoints.values()
