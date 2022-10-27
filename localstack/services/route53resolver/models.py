@@ -126,9 +126,7 @@ class Route53ResolverStore(BaseStore):
 
         self.get_resolver_query_log_config(id)
         resolver_query_log_config = self.resolver_query_log_configs.pop(id)
-        # print("resolver_query_log_config before ", resolver_query_log_config)
         resolver_query_log_config["Status"] = "DELETING"
-        # print("resolver_query_log_config status ", resolver_query_log_config)
         return resolver_query_log_config
 
     def get_resolver_query_log_config_associations(self, id):

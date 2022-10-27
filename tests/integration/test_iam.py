@@ -465,8 +465,8 @@ class TestIAMIntegrations:
     def test_update_assume_role_policy(self, iam_client, snapshot):
         snapshot.add_transformer(snapshot.transform.iam_api())
         snapshot.add_transformer(snapshot.transform.resource_name("role_name"))
-        snapshot.add_transformer(snapshot.transform.jsonpath("RoleId", "role_id"))
-
+        snapshot.add_transformer(snapshot.transform.key_value("RoleId", "role_id"))
+        
         policy = {
             "Version": "2012-10-17",
             "Statement": [
