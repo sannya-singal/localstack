@@ -43,6 +43,8 @@ from localstack.aws.api.route53resolver import (
     GetFirewallRuleGroupResponse,
     GetResolverQueryLogConfigAssociationResponse,
     GetResolverQueryLogConfigResponse,
+    InvalidParameterException,
+    InvalidRequestException,
     ListDomainMaxResults,
     ListFirewallConfigsMaxResult,
     ListFirewallConfigsResponse,
@@ -702,3 +704,55 @@ def Route53ResolverBackend_matched_arn(fn, self, resource_arn):
         if resolver_query_log_config.get("Arn") == resource_arn:
             return
     fn(self, resource_arn)
+
+
+@patch(MotoRoute53ResolverBackend.disassociate_resolver_rule)
+def moto_disassociate_resolver_rule(fn, self, resolver_rule_id, vpc_id):
+    if resolver_rule_id not in self.resolver_rules:
+        raise ResourceNotFoundException(
+            f'[RSLVR-00703] Resolver rule with ID "{resolver_rule_id}" does not exist.'
+        )
+    return fn(self, resolver_rule_id, vpc_id)
+
+
+@patch(MotoRoute53ResolverBackend.create_resolver_endpoint)
+def moto_create_resolver_endpoint(fn, self, *args, **kwargs):
+    for group_id in kwargs.get("security_group_ids"):
+        if not group_id.startswith("sg-"):
+            # raise InvalidParameterException(
+            #     f"Malformed security group ID: Invalid id: '{group_id}' "
+            #     f"(expecting 'sg-...')"
+            # )
+            raise InvalidParameterException(
+                f'[RSLVR-00408] Malformed security group ID: "Invalid id: "{group_id}" '
+                f'(expecting "sg-...")".'
+            )
+
+    return fn(self, *args, **kwargs)
+
+
+@patch(MotoRoute53ResolverBackend.delete_resolver_rule)
+def moto_delete_resolver_endpoint(fn, self, resolver_rule_id):
+    if resolver_rule_id not in self.resolver_rules:
+        raise ResourceNotFoundException(
+            f'[RSLVR-00703] Resolver rule with ID "{resolver_rule_id}" does not exist.'
+        )
+    return fn(self, resolver_rule_id)
+
+
+@patch(MotoRoute53ResolverBackend.create_resolver_rule)
+def moto_create_resolver_rule(fn, self, *args, **kwargs):
+    # rslver_id = kwargs.get("resolver_endpoint_id")
+    direction = [
+        x.direction
+        for x in self.resolver_endpoints.values()
+        if x.id == kwargs.get("resolver_endpoint_id")
+    ]
+    print("direction: ", direction)
+    print("direction[0]", direction[0])
+    if direction[0] == "INBOUND":
+        print("check 724")
+        raise InvalidRequestException(
+            "Resolver rules can only be associated to OUTBOUND resolver endpoints."
+        )
+    return fn(self, *args, **kwargs)
