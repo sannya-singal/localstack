@@ -743,7 +743,7 @@ def moto_create_resolver_rule(fn, self, *args, **kwargs):
         for x in self.resolver_endpoints.values()
         if x.id == kwargs.get("resolver_endpoint_id")
     ]
-    if direction[0] == "INBOUND":
+    if direction and direction[0] == "INBOUND":
         raise InvalidRequestException(
             "Resolver rules can only be associated to OUTBOUND resolver endpoints."
         )
