@@ -70,8 +70,8 @@ env:
 jobs:
   build:
     name: "Build Docker Image (${{ contains(matrix.runner, 'arm') && 'ARM64' || 'AMD64' }})"
-    needs:
-      - test-preflight
+#    needs:
+#      - test-preflight
     strategy:
       matrix:
         runner:
@@ -139,7 +139,7 @@ jobs:
           fetch-depth: 0
 
       - name: Prepare Local Test Environment
-        uses: ./.github/actions/setup-test-env@dup-circleci-ga-mamr
+        uses: sannya-singal/localstack/.github/actions/setup-test-env@dup-circleci-ga-mamr
 
       - name: Linting
         run: make lint
