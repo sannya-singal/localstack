@@ -37,7 +37,7 @@ env:
 jobs:
   test-ma-mr:
     name: "Run integration tests"
-    uses: ./.github/workflows/aws-tests.yml
+    uses: ./.github/workflows/aws-tests1.yml
     with:
       disableCaching: ${{ inputs.disableCaching == true }}
       PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
