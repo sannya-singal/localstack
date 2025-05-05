@@ -6,6 +6,7 @@ on:
   push:
     paths:
       - '.github/workflows/aws-tests-mamr.yml'
+      - '.github/workflows/aws-tests1.yml'
 #  pull_request:
 #    paths:
 #      - '.github/workflows/aws-tests-mamr.yml'
