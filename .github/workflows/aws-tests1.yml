@@ -66,8 +66,6 @@ on:
         default: false
         required: false
         type: boolean
-      testAWSRegion:
-
       testAWSCredentials:
         description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
         required: false
