@@ -33,7 +33,7 @@ env:
   TINYBIRD_DATASOURCE: "community_tests_circleci_ma_mr"
   TEST_AWS_REGION_NAME: "us-east-2"
   TEST_AWS_ACCOUNT_ID: "00000000004"
-  TEST_AWS_ACCESS_KEY_ID: "00000000004"
+  TEST_AWS_ACCESS_KEY_ID: "00000000003"
 
 jobs:
   test-ma-mr:
