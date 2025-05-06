@@ -19,13 +19,13 @@ env:
 #  TEST_AWS_ACCESS_KEY_ID: "00000000003"
 
 jobs:
-  test-ma-mr:
-    name: "Run integration tests"
+  generate-vars:
     runs-on: ubuntu-latest
+    outputs:
+      region: ${{ steps.generate-aws-values.outputs.region }}
+      account_id: ${{ steps.generate-aws-values.outputs.account_id }}
+      access_key: ${{ steps.generate-aws-values.outputs.account_id }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Generate random AWS Credentials
         id: generate-aws-values
         run: |
@@ -38,12 +38,14 @@ jobs:
           REGION=${REGIONS[RANDOM % ${#REGIONS[@]}]}
           echo "region=$REGION" >> $GITHUB_OUTPUT
 
-      - name: Run integration workflow
-        uses: ./.github/workflows/aws-tests1.yml
-        env:
-          TEST_AWS_REGION_NAME: ${{ steps.generate-aws-values.outputs.region }}
-          TEST_AWS_ACCOUNT_ID: ${{ steps.generate-aws-values.outputs.account_id }}
-          TEST_AWS_ACCESS_KEY_ID: ${{ steps.generate-aws-values.outputs.account_id }}
-        with:
-          disableCaching: ${{ inputs.disableCaching == true }}
-          PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
+  test-ma-mr:
+    name: "Run integration tests"
+    needs: generate-vars
+    uses: ./.github/workflows/aws-tests1.yml
+    with:
+      disableCaching: ${{ inputs.disableCaching == true }}
+      PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
+    env:
+      TEST_AWS_REGION_NAME: ${{ needs.generate-vars.outputs.region }}
+      TEST_AWS_ACCOUNT_ID: ${{ needs.generate-vars.outputs.account_id }}
+      TEST_AWS_ACCESS_KEY_ID: ${{ needs.generate-vars.outputs.access_key }}
