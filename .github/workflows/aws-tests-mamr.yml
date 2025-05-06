@@ -39,7 +39,7 @@ jobs:
           echo "region=$REGION" >> $GITHUB_OUTPUT
 
       - name: Run integration workflow
-        uses: ./.github/workflows/aws-tests.yml
+        uses: ./.github/workflows/aws-tests1.yml
         env:
           TEST_AWS_REGION_NAME: ${{ steps.generate-aws-values.outputs.region }}
           TEST_AWS_ACCOUNT_ID: ${{ steps.generate-aws-values.outputs.account_id }}
