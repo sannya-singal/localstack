@@ -20,7 +20,7 @@ jobs:
     name: "Generate random AWS credentials"
     runs-on: ubuntu-latest
     outputs:
-      creds: ${{ steps.generate-vars.outputs.creds }}
+      creds: ${{ steps.generate-aws-values.outputs.creds }}
     steps:
       - name: Generate values
         id: generate-aws-values
