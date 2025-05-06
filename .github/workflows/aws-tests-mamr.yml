@@ -14,9 +14,6 @@ on:
 env:
   IMAGE_NAME: "localstack/localstack"
   TINYBIRD_DATASOURCE: "community_tests_circleci_ma_mr"
-#  TEST_AWS_REGION_NAME: "us-east-2"
-#  TEST_AWS_ACCOUNT_ID: "00000000004"
-#  TEST_AWS_ACCESS_KEY_ID: "00000000003"
 
 jobs:
   generate-vars:
@@ -45,7 +42,6 @@ jobs:
     with:
       disableCaching: ${{ inputs.disableCaching == true }}
       PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
-    env:
       TEST_AWS_REGION_NAME: ${{ needs.generate-vars.outputs.region }}
       TEST_AWS_ACCOUNT_ID: ${{ needs.generate-vars.outputs.account_id }}
       TEST_AWS_ACCESS_KEY_ID: ${{ needs.generate-vars.outputs.access_key }}
