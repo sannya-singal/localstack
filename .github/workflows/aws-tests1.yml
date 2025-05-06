@@ -37,6 +37,7 @@ on:
         description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
         required: false
         type: string
+        default: 'us-east-1,000000000000,000000000000'
 
   workflow_call:
     inputs:
@@ -65,6 +66,8 @@ on:
         default: false
         required: false
         type: boolean
+      testAWSRegion:
+
       testAWSCredentials:
         description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
         required: false
