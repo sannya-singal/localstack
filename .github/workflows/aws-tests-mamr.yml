@@ -10,13 +10,15 @@ on:
 #  pull_request:
 #    paths:
 #      - '.github/workflows/aws-tests-mamr.yml'
+#      - '.github/workflows/aws-tests.yml'
+
 
 env:
   IMAGE_NAME: "localstack/localstack"
   TINYBIRD_DATASOURCE: "community_tests_circleci_ma_mr"
 
 jobs:
-  generate-vars:
+  generate-random-creds:
     name: "Generate random AWS credentials"
     runs-on: ubuntu-latest
     outputs:
@@ -37,11 +39,11 @@ jobs:
 
   test-ma-mr:
     name: "Run integration tests"
-    needs: generate-vars
+    needs: generate-random-creds
     uses: ./.github/workflows/aws-tests1.yml
     with:
       disableCaching: ${{ inputs.disableCaching == true }}
       PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
-      testAWSRegion: ${{ needs.generate-vars.outputs.region }}
-      testAWSAccountId: ${{ needs.generate-vars.outputs.account_id }}
-      testAWSAccessKeyId: ${{ needs.generate-vars.outputs.account_id }}
+      testAWSRegion: ${{ needs.generate-random-creds.outputs.region }}
+      testAWSAccountId: ${{ needs.generate-random-creds.outputs.account_id }}
+      testAWSAccessKeyId: ${{ needs.generate-random-creds.outputs.account_id }}
