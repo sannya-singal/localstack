@@ -33,18 +33,11 @@ on:
         default: false
         required: false
         type: boolean
-      TEST_AWS_REGION_NAME:
-        description: 'AWS Region Name'
+      testAWSCredentials:
+        description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
         required: false
         type: string
-      TEST_AWS_ACCOUNT_ID:
-        description: 'AWS Account ID'
-        required: false
-        type: string
-      TEST_AWS_ACCESS_KEY_ID:
-        description: 'AWS Access Key ID'
-        required: false
-        type: string
+
   workflow_call:
     inputs:
       disableCaching:
@@ -72,24 +65,20 @@ on:
         default: false
         required: false
         type: boolean
-      TEST_AWS_REGION_NAME:
-        description: 'AWS Region Name'
+      testAWSCredentials:
+        description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
         required: false
         type: string
-      TEST_AWS_ACCOUNT_ID:
-        description: 'AWS Account ID'
-        required: false
-        type: string
-      TEST_AWS_ACCESS_KEY_ID:
-        description: 'AWS Access Key ID'
-        required: false
-        type: string
+        default: 'us-east-1,000000000000,000000000000'
 
 env:
   PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL || 'WARNING' }}
   IMAGE_NAME: "localstack/localstack"
   TINYBIRD_DATASOURCE: "community_tests_integration"
   TESTSELECTION_PYTEST_ARGS: "${{ !inputs.disableTestSelection && '--path-filter=dist/testselection/test-selection.txt ' || '' }}"
+  TEST_AWS_REGION_NAME: ${{ fromJson(format('["{0}"]', replace(inputs.testAWSCredentials, ',', '","')))[0] }}
+  TEST_AWS_ACCOUNT_ID: ${{ fromJson(format('["{0}"]', replace(inputs.testAWSCredentials, ',', '","')))[1] }}
+  TEST_AWS_ACCESS_KEY_ID: ${{ fromJson(format('["{0}"]', replace(inputs.testAWSCredentials, ',', '","')))[2] }}
 
 jobs:
   build:

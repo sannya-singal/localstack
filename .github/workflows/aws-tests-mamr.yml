@@ -17,13 +17,13 @@ env:
 
 jobs:
   generate-vars:
+    name: "Generate random AWS credentials"
     runs-on: ubuntu-latest
     outputs:
       region: ${{ steps.generate-aws-values.outputs.region }}
       account_id: ${{ steps.generate-aws-values.outputs.account_id }}
-      access_key: ${{ steps.generate-aws-values.outputs.account_id }}
     steps:
-      - name: Generate random AWS Credentials
+      - name: Generate values
         id: generate-aws-values
         run: |
           # Generate a random 12-digit number for TEST_AWS_ACCOUNT_ID
@@ -41,7 +41,9 @@ jobs:
     uses: ./.github/workflows/aws-tests1.yml
     with:
       disableCaching: ${{ inputs.disableCaching == true }}
+      testAWSCredentials: >-
+        ${{ format('{0},{1},{2}',
+          needs.generate-vars.outputs.region,
+          needs.generate-vars.outputs.account_id,
+          needs.generate-vars.outputs.account_id) }}
       PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
-      TEST_AWS_REGION_NAME: ${{ needs.generate-vars.outputs.region }}
-      TEST_AWS_ACCOUNT_ID: ${{ needs.generate-vars.outputs.account_id }}
-      TEST_AWS_ACCESS_KEY_ID: ${{ needs.generate-vars.outputs.access_key }}
