@@ -20,20 +20,23 @@ jobs:
     name: "Generate random AWS credentials"
     runs-on: ubuntu-latest
     outputs:
-      region: ${{ steps.generate-aws-values.outputs.region }}
-      account_id: ${{ steps.generate-aws-values.outputs.account_id }}
+      creds: ${{ steps.generate.outputs.creds }}
+#      ${{ steps.generate-aws-values.outputs.region }}
+#      account_id: ${{ steps.generate-aws-values.outputs.account_id }}
     steps:
       - name: Generate values
         id: generate-aws-values
         run: |
           # Generate a random 12-digit number for TEST_AWS_ACCOUNT_ID
           ACCOUNT_ID=$(shuf -i 100000000000-999999999999 -n 1)
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+#          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
 
           # Set TEST_AWS_REGION_NAME to a random AWS region other than us-east-1
           REGIONS=("us-east-2" "us-west-1" "us-west-2" "ap-southeast-2" "ap-northeast-1" "eu-central-1" "eu-west-1")
           REGION=${REGIONS[RANDOM % ${#REGIONS[@]}]}
-          echo "region=$REGION" >> $GITHUB_OUTPUT
+#          echo "region=$REGION" >> $GITHUB_OUTPUT
+          CREDS="${REGION},${ACCOUNT_ID},${ACCOUNT_ID}"
+          echo "creds=$CREDS" >> $GITHUB_OUTPUT
 
   test-ma-mr:
     name: "Run integration tests"
@@ -41,9 +44,5 @@ jobs:
     uses: ./.github/workflows/aws-tests1.yml
     with:
       disableCaching: ${{ inputs.disableCaching == true }}
-      testAWSCredentials: >-
-        ${{ format('{0},{1},{2}',
-          needs.generate-vars.outputs.region,
-          needs.generate-vars.outputs.account_id,
-          needs.generate-vars.outputs.account_id) }}
+      testAWSCredentials: ${{ needs.generate-vars.outputs.creds }}
       PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL }}
