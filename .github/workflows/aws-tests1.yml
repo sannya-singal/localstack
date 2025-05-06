@@ -23,11 +23,6 @@ on:
         required: false
         type: boolean
         default: false
-#      randomize-aws-credentials:
-#        description: "Randomize AWS credentials"
-#        default: false
-#        required: false
-#        type: boolean
       onlyAcceptanceTests:
         description: "Run only acceptance tests"
         default: false
@@ -48,11 +43,6 @@ on:
         required: false
         type: string
         default: 'test'
-#      testAWSCredentials:
-#        description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
-#        required: false
-#        type: string
-#        default: 'us-east-1,000000000000,000000000000'
 
   workflow_call:
     inputs:
@@ -71,11 +61,6 @@ on:
         required: false
         type: boolean
         default: false
-#      randomize-aws-credentials:
-#        description: "Randomize AWS credentials"
-#        default: false
-#        required: false
-#        type: boolean
       onlyAcceptanceTests:
         description: "Run only acceptance tests"
         default: false
@@ -96,11 +81,6 @@ on:
         required: false
         type: string
         default: 'test'
-#      testAWSCredentials:
-#        description: 'AWS test credentials in format REGION,ACCOUNT_ID,ACCESS_KEY_ID'
-#        required: false
-#        type: string
-#        default: 'us-east-1,000000000000,000000000000'
 
 env:
   PYTEST_LOGLEVEL: ${{ inputs.PYTEST_LOGLEVEL || 'WARNING' }}
@@ -656,7 +636,7 @@ jobs:
 
   capture-not-implemented:
     name: "Capture Not Implemented"
-    if: ${{ !inputs.onlyAcceptanceTests && github.ref == 'refs/heads/master' && github.ref != 'refs/heads/dup-circleci-ga-mamr' }}
+    if: ${{ !inputs.onlyAcceptanceTests && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dup-circleci-ga-mamr') }}
     runs-on: ubuntu-latest
     needs: build
     env:
